@@ -1,0 +1,13 @@
+# Secrets — NEVER commit
+.env
+
+# Rust
+/target
+**/*.rs.bk
+# Cargo.lock is committed on purpose (this is a binary/app: reproducible builds)
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

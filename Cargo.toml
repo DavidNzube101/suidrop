@@ -1,0 +1,22 @@
+[package]
+name = "suidrop"
+version = "0.1.0"
+edition = "2021"
+description = "SuiDrop — trustless, end-to-end encrypted file transfer on Walrus + Sui, powered by Tatum."
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+
+[[bin]]
+name = "suidrop"
+path = "src/main.rs"

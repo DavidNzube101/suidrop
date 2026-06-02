@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SuiDrop — trustless encrypted file transfer</title>
+<style>
+  :root {
+    --bg: #060b14;
+    --panel: #0d1825;
+    --panel-2: #122236;
+    --ink: #e8f0fa;
+    --muted: #7c93ad;
+    --accent: #36d1c4;
+    --accent-2: #4a9eff;
+    --danger: #ff6b6b;
+    --line: #1d3047;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 700px at 70% -10%, #0f2236 0%, var(--bg) 55%);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 28px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; font-size: 18px;
+  }
+  .net {
+    font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+    padding: 5px 12px; border-radius: 999px; text-transform: capitalize;
+  }
+  .net b { color: var(--accent); }
+  main { flex: 1; display: grid; place-items: center; padding: 32px 20px; }
+  .card {
+    width: 100%; max-width: 560px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 28px; box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: var(--radius);
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.hot { border-color: var(--accent); background: var(--panel-2); }
+  .drop .big { font-size: 16px; font-weight: 600; }
+  .drop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  input[type=file] { display: none; }
+  button {
+    appearance: none; border: 0; cursor: pointer; font-weight: 600;
+    border-radius: 12px; padding: 13px 18px; font-size: 14px; color: #04121a;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    width: 100%; margin-top: 16px; transition: opacity .15s, transform .05s;
+  }
+  button:hover { opacity: .92; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .status { margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  .status.err { color: var(--danger); }
+  .result { margin-top: 18px; display: none; }
+  .field {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .field input {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--ink); border-radius: 10px; padding: 11px 12px; font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .field button { width: auto; margin: 0; padding: 0 16px; font-size: 13px; }
+  .meta { display: flex; gap: 10px; align-items: center; margin: 4px 0 2px; }
+  .meta .name { font-weight: 600; }
+  .meta .size { color: var(--muted); font-size: 13px; }
+  .lock { color: var(--accent); }
+  footer {
+    text-align: center; color: var(--muted); font-size: 12px;
+    padding: 18px; border-top: 1px solid var(--line);
+  }
+  footer b { color: var(--ink); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+  .bar { height: 4px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin-top: 14px; display: none; }
+  .bar > i { display: block; height: 100%; width: 30%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width .2s; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">🐳</span> SuiDrop</div>
+    <div class="net">network: <b id="net">…</b></div>
+  </header>
+
+  <main>
+    <!-- SEND -->
+    <section class="card" id="send">
+      <h1>Send a file, trustlessly</h1>
+      <p class="sub">Your file is encrypted in your browser, stored on <b>Walrus</b> decentralized storage, and shared as a link. The decryption key lives only in the link — our server never sees it.</p>
+
+      <label class="drop" id="drop">
+        <div class="big" id="dropTitle">Drop a file or click to choose</div>
+        <div class="small" id="dropSub">Encrypted locally before it ever leaves your device</div>
+        <input type="file" id="file" />
+      </label>
+
+      <div class="bar" id="bar"><i id="barFill"></i></div>
+      <button id="sendBtn" disabled>Encrypt &amp; upload to Walrus</button>
+      <div class="status" id="sendStatus"></div>
+
+      <div class="result" id="result">
+        <div class="meta"><span class="lock">🔒</span> <span>Share this link — it carries the key in the <code>#</code> part:</span></div>
+        <div class="field">
+          <input id="shareLink" readonly />
+          <button id="copyBtn" class="ghost">Copy</button>
+        </div>
+        <p class="hint">Anyone with this link can decrypt and download. The key after <code>#</code> is never sent to the server. Blob lives on Walrus for the configured storage epochs.</p>
+      </div>
+    </section>
+
+    <!-- RECEIVE -->
+    <section class="card" id="receive" style="display:none">
+      <h1>Someone sent you a file</h1>
+      <p class="sub">It's encrypted. Decryption happens in your browser using the key from the link.</p>
+      <div class="meta">
+        <span class="lock">🔒</span>
+        <span class="name" id="rName">Fetching from Walrus…</span>
+        <span class="size" id="rSize"></span>
+      </div>
+      <div class="bar" id="rBar"><i id="rBarFill"></i></div>
+      <button id="recvBtn" disabled>Decrypt &amp; download</button>
+      <div class="status" id="recvStatus"></div>
+      <button class="ghost" id="sendInstead" style="margin-top:10px">Send a file instead →</button>
+    </section>
+  </main>
+
+  <footer>
+    Encrypted in-browser · stored on <b>Walrus</b> · on <b>Sui</b> via <b>Tatum</b> RPC
+  </footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+/* ---------- base64url helpers ---------- */
+function b64url(bytes) {
+  const a = new Uint8Array(bytes); let s = "";
+  for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function unb64url(str) {
+  str = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (str.length % 4) str += "=";
+  const bin = atob(str), a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+
+/* ---------- Walrus blob id extraction (handles publisher response shapes) ---------- */
+function extractBlobId(j) {
+  return j?.newlyCreated?.blobObject?.blobId
+      || j?.alreadyCertified?.blobId
+      || j?.blobId
+      || null;
+}
+
+/* ---------- config badge ---------- */
+(async () => {
+  try { const r = await fetch("/api/config"); const j = await r.json(); $("net").textContent = j.network; }
+  catch (_) { $("net").textContent = "offline"; }
+})();
+
+/* ---------- SEND flow ---------- */
+let chosen = null;
+const drop = $("drop");
+["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("hot"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", ev => { if (ev.dataTransfer.files[0]) pick(ev.dataTransfer.files[0]); });
+$("file").addEventListener("change", ev => { if (ev.target.files[0]) pick(ev.target.files[0]); });
+
+function fmtSize(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(2) + " MB";
+}
+function pick(f) {
+  chosen = f;
+  $("dropTitle").textContent = f.name;
+  $("dropSub").textContent = fmtSize(f.size) + " · ready to encrypt";
+  $("sendBtn").disabled = false;
+  $("result").style.display = "none";
+  $("sendStatus").textContent = "";
+}
+
+$("sendBtn").addEventListener("click", async () => {
+  if (!chosen) return;
+  const btn = $("sendBtn"), st = $("sendStatus");
+  btn.disabled = true; st.className = "status"; st.textContent = "Encrypting in your browser…";
+  $("bar").style.display = "block"; $("barFill").style.width = "25%";
+  try {
+    // Build envelope: [4-byte metaLen][metaJSON][fileBytes]
+    const fileBytes = new Uint8Array(await chosen.arrayBuffer());
+    const metaBytes = enc.encode(JSON.stringify({ name: chosen.name, type: chosen.type || "application/octet-stream", size: chosen.size }));
+    const plain = new Uint8Array(4 + metaBytes.length + fileBytes.length);
+    new DataView(plain.buffer).setUint32(0, metaBytes.length, false);
+    plain.set(metaBytes, 4);
+    plain.set(fileBytes, 4 + metaBytes.length);
+
+    // Encrypt AES-GCM 256
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain));
+    const blob = new Uint8Array(12 + ct.length);
+    blob.set(iv, 0); blob.set(ct, 12);
+    const keyStr = b64url(await crypto.subtle.exportKey("raw", key));
+
+    $("barFill").style.width = "60%"; st.textContent = "Uploading encrypted blob to Walrus…";
+    const res = await fetch("/api/walrus/upload", { method: "POST", headers: { "content-type": "application/octet-stream" }, body: blob });
+    if (!res.ok) throw new Error("Walrus upload failed (" + res.status + ")");
+    const j = await res.json();
+    const blobId = extractBlobId(j);
+    if (!blobId) throw new Error("No blob id returned by Walrus");
+
+    $("barFill").style.width = "100%";
+    const link = location.origin + "/?d=" + encodeURIComponent(blobId) + "#" + keyStr;
+    $("shareLink").value = link;
+    $("result").style.display = "block";
+    st.textContent = "Done — stored on Walrus. Blob id: " + blobId.slice(0, 12) + "…";
+    setTimeout(() => { $("bar").style.display = "none"; $("barFill").style.width = "0%"; }, 600);
+  } catch (e) {
+    st.className = "status err"; st.textContent = "✕ " + e.message;
+    $("bar").style.display = "none";
+  } finally { btn.disabled = false; }
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  await navigator.clipboard.writeText($("shareLink").value);
+  $("copyBtn").textContent = "Copied!";
+  setTimeout(() => $("copyBtn").textContent = "Copy", 1400);
+});
+
+/* ---------- RECEIVE flow ---------- */
+$("sendInstead").addEventListener("click", () => { location.href = "/"; });
+
+async function startReceive(blobId, keyStr) {
+  $("send").style.display = "none";
+  $("receive").style.display = "block";
+  const st = $("recvStatus");
+  if (!keyStr) { st.className = "status err"; st.textContent = "✕ Missing decryption key in link (#…)"; return; }
+
+  $("rBar").style.display = "block"; $("rBarFill").style.width = "30%";
+  let decrypted = null, meta = null;
+  try {
+    const res = await fetch("/api/walrus/blob/" + encodeURIComponent(blobId));
+    if (!res.ok) throw new Error("Could not fetch blob from Walrus (" + res.status + ")");
+    const data = new Uint8Array(await res.arrayBuffer());
+    $("rBarFill").style.width = "65%";
+
+    const iv = data.slice(0, 12), ct = data.slice(12);
+    const key = await crypto.subtle.importKey("raw", unb64url(keyStr), { name: "AES-GCM" }, false, ["decrypt"]);
+    const plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct));
+
+    const metaLen = new DataView(plain.buffer, plain.byteOffset, 4).getUint32(0, false);
+    meta = JSON.parse(dec.decode(plain.slice(4, 4 + metaLen)));
+    decrypted = plain.slice(4 + metaLen);
+
+    $("rBarFill").style.width = "100%";
+    $("rName").textContent = meta.name;
+    $("rSize").textContent = fmtSize(decrypted.length);
+    $("recvBtn").disabled = false;
+    st.textContent = "Decrypted locally. Ready to save.";
+    setTimeout(() => { $("rBar").style.display = "none"; $("rBarFill").style.width = "0%"; }, 600);
+  } catch (e) {
+    st.className = "status err"; st.textContent = "✕ " + e.message + " (wrong key or expired blob?)";
+    $("rBar").style.display = "none"; return;
+  }
+
+  $("recvBtn").onclick = () => {
+    const url = URL.createObjectURL(new Blob([decrypted], { type: meta.type || "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = meta.name || "download"; a.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+/* ---------- route: ?d=<blobId>#<key> means receive ---------- */
+const params = new URLSearchParams(location.search);
+const d = params.get("d");
+if (d) startReceive(d, location.hash ? location.hash.slice(1) : "");
+</script>
+</body>
+</html>
