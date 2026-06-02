@@ -131,7 +131,8 @@ async fn rpc_proxy(State(s): State<AppState>, body: Bytes) -> Response {
 
     match resp {
         Ok(r) => {
-            let status = StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
             let bytes = r.bytes().await.unwrap_or_default();
             (status, [(header::CONTENT_TYPE, "application/json")], bytes).into_response()
         }
@@ -157,7 +158,8 @@ async fn walrus_upload(State(s): State<AppState>, body: Bytes) -> Response {
 
     match resp {
         Ok(r) => {
-            let status = StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
             let bytes = r.bytes().await.unwrap_or_default();
             (status, [(header::CONTENT_TYPE, "application/json")], bytes).into_response()
         }
@@ -175,7 +177,8 @@ async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> R
 
     match s.http.get(&url).send().await {
         Ok(r) => {
-            let status = StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
             let bytes = r.bytes().await.unwrap_or_default();
             (
                 status,
@@ -184,7 +187,11 @@ async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> R
             )
                 .into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY, format!("walrus download error: {e}")).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            format!("walrus download error: {e}"),
+        )
+            .into_response(),
     }
 }
 
@@ -232,7 +239,5 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("failed to bind port");
-    axum::serve(listener, app)
-        .await
-        .expect("server crashed");
+    axum::serve(listener, app).await.expect("server crashed");
 }
