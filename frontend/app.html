@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SuiDrop — trustless encrypted file transfer</title>
+<title>Send a file | SuiDrop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -37,11 +37,7 @@
     backdrop-filter: blur(3px);
   }
   .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; color: var(--ink); text-decoration: none; }
-  .logo {
-    width: 34px; height: 34px; display: grid; place-items: center; font-size: 17px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #021016;
-    box-shadow: 0 0 16px rgba(46,230,214,.5); clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
-  }
+  .logo { width: 32px; height: 32px; object-fit: contain; display: block; }
   .net {
     display: flex; align-items: center; gap: 7px;
     font-size: 12px; color: var(--muted); border: 1px solid var(--line);
@@ -155,7 +151,7 @@
 </head>
 <body>
   <header>
-    <a class="brand" href="/"><span class="logo">🐳</span> SuiDrop</a>
+    <a class="brand" href="/"><img class="logo" src="/media/logo.png" alt="SuiDrop" /></a>
     <div class="net"><svg class="globe" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/></svg><b id="net">…</b></div>
   </header>
 
@@ -398,6 +394,7 @@ async function verifyReceipt(receiptId, blobId) {
 }
 
 async function startReceive(blobId, keyStr, receiptId) {
+  document.title = "Receive a file | SuiDrop";
   $("sendFrame").style.display = "none";
   $("receiveFrame").style.display = "block";
   const st = $("recvStatus");

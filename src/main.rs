@@ -363,6 +363,7 @@ async fn main() {
         .route("/esm/*path", get(esm_proxy))
         .route_service("/", ServeFile::new("frontend/landing.html"))
         .route_service("/app", ServeFile::new("frontend/app.html"))
+        .nest_service("/media", ServeDir::new("media"))
         .fallback_service(ServeDir::new("frontend"))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .layer(CorsLayer::permissive())
