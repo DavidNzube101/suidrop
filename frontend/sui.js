@@ -1,20 +1,8 @@
-// SuiDrop — Sui on-chain layer (browser wallet signing + receipt verification).
-// No bundler: everything is ESM loaded straight from a CDN.
-//
-// - Signing/execution is done by the user's wallet (Slush, via wallet-standard).
-// - Reads/verification go through OUR backend /api/rpc, which proxies to Tatum
-//   (rate-limited), so Tatum RPC does real, recurring work.
-
-// Loaded through our backend /esm proxy (same-origin) to avoid CDN CORS/MIME
-// issues. Versions pinned: @mysten/sui 2.x, @mysten/wallet-standard 0.20.x.
 import { getWallets } from "/esm/@mysten/wallet-standard@0.20.3?target=es2022";
 import { Transaction } from "/esm/@mysten/sui@2.17.0/transactions?target=es2022";
 
-const CLOCK_ID = "0x6"; // shared sui::clock::Clock object
+const CLOCK_ID = "0x6";
 
-/* ---------------- wallet ---------------- */
-
-/** Find a Sui-capable wallet (Slush, Nightly, etc.); prefer Slush if present. */
 export function findSuiWallet(preferred = "slush") {
   const sui = getWallets()
     .get()
@@ -30,7 +18,6 @@ export function findSuiWallet(preferred = "slush") {
   );
 }
 
-/** Connect and return the first account. */
 export async function connect(wallet) {
   await wallet.features["standard:connect"].connect();
   const account = wallet.accounts[0];
@@ -38,12 +25,6 @@ export async function connect(wallet) {
   return account;
 }
 
-/* ---------------- write: mint receipt ---------------- */
-
-/**
- * Build + sign + execute the create_receipt move call via the wallet.
- * Returns the transaction digest.
- */
 export async function createReceipt({
   wallet,
   account,
@@ -52,7 +33,7 @@ export async function createReceipt({
   blobId,
   recipient,
   size,
-  nameHash, // Uint8Array
+  nameHash,
   expiryEpochs,
 }) {
   const tx = new Transaction();
@@ -68,7 +49,6 @@ export async function createReceipt({
     ],
   });
 
-  // Prefer the v2 feature; fall back to v1 for older wallet builds.
   const v2 = wallet.features["sui:signAndExecuteTransaction"];
   const v1 = wallet.features["sui:signAndExecuteTransactionBlock"];
   if (v2) {
@@ -82,9 +62,6 @@ export async function createReceipt({
   throw new Error("Wallet does not support signing Sui transactions");
 }
 
-/* ---------------- read: via Tatum RPC proxy ---------------- */
-
-/** Call Sui JSON-RPC through our throttled Tatum proxy. */
 export async function rpc(method, params) {
   const res = await fetch("/api/rpc", {
     method: "POST",
@@ -96,10 +73,6 @@ export async function rpc(method, params) {
   return j.result;
 }
 
-/**
- * Resolve the created DropReceipt object id from a tx digest.
- * Retries because the indexer may lag a beat behind execution.
- */
 export async function receiptIdFromTx(digest, { retries = 6, delayMs = 1500 } = {}) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -112,14 +85,13 @@ export async function receiptIdFromTx(digest, { retries = 6, delayMs = 1500 } = 
       );
       if (created) return created.objectId;
     } catch (_) {
-      /* keep retrying */
+      void 0;
     }
     await new Promise((r) => setTimeout(r, delayMs));
   }
   return null;
 }
 
-/** Fetch a receipt object's fields (the on-chain proof) via Tatum RPC. */
 export async function fetchReceipt(objectId) {
   const obj = await rpc("sui_getObject", [
     objectId,
@@ -128,11 +100,8 @@ export async function fetchReceipt(objectId) {
   return obj?.data?.content?.fields || null;
 }
 
-/* ---------------- helpers ---------------- */
-
 export const ZERO_ADDR = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
-/** SHA-256 of a string -> Uint8Array (used to hash the filename). */
 export async function sha256(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return new Uint8Array(buf);
@@ -142,7 +111,6 @@ export function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** SuiVision explorer base for the active network. */
 export function explorerBase(network) {
   if (network === "mainnet") return "https://suivision.xyz";
   return `https://${network}.suivision.xyz`;

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SuiDrop — trustless encrypted file transfer on Sui + Walrus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  @property --glint { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+  :root {
+    --bg: #050a14;
+    --panel: #0a1422;
+    --panel-2: #0e1c30;
+    --ink: #eaf1fb;
+    --muted: #7589a3;
+    --blue: #4a9eff;
+    --blue-2: #2f6bff;
+    --cyan: #38e0d0;
+    --line: #16314f;
+  }
+  * { box-sizing: border-box; border-radius: 0 !important; }
+  html { scroll-behavior: smooth; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); background: var(--bg);
+    background-image:
+      radial-gradient(900px 520px at 18% -8%, rgba(47,107,255,.20), transparent 60%),
+      radial-gradient(800px 520px at 88% 8%, rgba(56,224,208,.10), transparent 55%);
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--blue); color: #04101f; }
+
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 30px; border-bottom: 1px solid var(--line);
+    background: rgba(5,10,20,.72); backdrop-filter: blur(10px);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
+  .logo {
+    width: 32px; height: 32px; display: grid; place-items: center; font-size: 16px;
+    background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #04101f;
+    box-shadow: 0 0 16px rgba(74,158,255,.5); clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
+  }
+  .links { display: flex; align-items: center; gap: 28px; }
+  .links a { color: var(--muted); font-size: 14px; font-weight: 500; transition: color .15s; }
+  .links a:hover { color: var(--ink); }
+  .cta {
+    background: linear-gradient(135deg, var(--blue), var(--blue-2)); color: #04101f;
+    font-weight: 600; font-size: 14px; padding: 9px 18px; border: 1px solid transparent;
+    box-shadow: 0 0 20px rgba(74,158,255,.35); transition: filter .15s, transform .05s;
+  }
+  .cta:hover { filter: brightness(1.08); }
+  .cta:active { transform: translateY(1px); }
+  @media (max-width: 720px) { .links a:not(.cta) { display: none; } }
+
+  .hero {
+    max-width: 1080px; margin: 0 auto; padding: 90px 30px 60px;
+    display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center;
+  }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-top: 56px; } }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted);
+    border: 1px solid var(--line); padding: 6px 13px; background: var(--panel);
+  }
+  .pill .dot { width: 7px; height: 7px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  h1 {
+    font-size: 52px; line-height: 1.05; letter-spacing: -.025em; margin: 20px 0 0; font-weight: 700;
+  }
+  @media (max-width: 900px) { h1 { font-size: 40px; } }
+  h1 .grad { background: linear-gradient(120deg, var(--blue), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { color: var(--muted); font-size: 17px; line-height: 1.6; margin: 20px 0 0; max-width: 520px; }
+  .hero-cta { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--blue), var(--blue-2)); color: #04101f; font-weight: 600;
+    font-size: 15px; padding: 13px 24px; box-shadow: 0 0 26px rgba(74,158,255,.4); transition: filter .15s, transform .05s;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-ghost { border: 1px solid var(--line); color: var(--ink); font-weight: 600; font-size: 15px; padding: 13px 22px; transition: border-color .15s; }
+  .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
+  .trust { display: flex; gap: 22px; margin-top: 30px; flex-wrap: wrap; }
+  .trust span { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+  .trust b { color: var(--ink); font-weight: 600; }
+
+  .visual { position: relative; padding: 1px; }
+  .visual::before {
+    content: ""; position: absolute; inset: 0; padding: 1px; pointer-events: none; z-index: 2;
+    background: conic-gradient(from var(--glint), transparent 0 62%, var(--blue) 80%, var(--cyan) 90%, transparent 97%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: glint 5s linear infinite;
+  }
+  @keyframes glint { to { --glint: 360deg; } }
+  .corner { position: absolute; width: 15px; height: 15px; z-index: 3; border: 2px solid var(--cyan); filter: drop-shadow(0 0 5px var(--cyan)); animation: pulse 2.6s ease-in-out infinite; }
+  .tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; animation-delay: .4s; }
+  .bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; animation-delay: .8s; }
+  .br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; animation-delay: .6s; }
+  @keyframes pulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+  .receipt {
+    position: relative; z-index: 1; background: linear-gradient(180deg, rgba(14,28,48,.95), rgba(8,16,28,.97));
+    border: 1px solid var(--line); padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  }
+  .receipt .rhead { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+  .receipt .verified { display: flex; align-items: center; gap: 8px; color: var(--cyan); font-weight: 600; font-size: 14px; }
+  .receipt .file { display: flex; align-items: center; gap: 10px; margin: 16px 0; font-weight: 600; }
+  .receipt .file .ic { width: 34px; height: 34px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line); color: var(--blue); }
+  .rrow { display: flex; justify-content: space-between; font-size: 12.5px; padding: 6px 0; font-family: ui-monospace, Menlo, monospace; }
+  .rrow span { color: var(--muted); }
+  .rrow b { color: var(--ink); font-weight: 600; }
+  .chip { font-size: 11px; color: var(--muted); border: 1px solid var(--line); padding: 4px 9px; }
+
+  section { max-width: 1080px; margin: 0 auto; padding: 70px 30px; }
+  .eyebrow { color: var(--blue); font-weight: 600; font-size: 13px; letter-spacing: .04em; }
+  .h2 { font-size: 34px; letter-spacing: -.02em; margin: 10px 0 0; font-weight: 700; }
+  .ssub { color: var(--muted); font-size: 16px; margin: 12px 0 0; max-width: 560px; line-height: 1.6; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  @media (max-width: 900px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .steps { grid-template-columns: 1fr; } }
+  .step { border: 1px solid var(--line); background: var(--panel); padding: 22px; transition: border-color .15s, transform .15s; }
+  .step:hover { border-color: var(--blue); transform: translateY(-3px); }
+  .step .n { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--blue); }
+  .step h3 { font-size: 16px; margin: 14px 0 8px; }
+  .step p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: 1fr; } }
+  .stat { position: relative; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel), rgba(8,16,28,.9)); padding: 26px; }
+  .stat .v { font-size: 38px; font-weight: 700; letter-spacing: -.02em; background: linear-gradient(120deg, var(--blue), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat .k { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .explorer-note { margin-top: 22px; color: var(--muted); font-size: 13.5px; }
+
+  .cli { border: 1px solid var(--line); background: #05101d; margin-top: 36px; }
+  .cli .top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .cli .top i { width: 11px; height: 11px; display: block; background: var(--line); }
+  .cli pre { margin: 0; padding: 20px 18px; font-family: ui-monospace, Menlo, monospace; font-size: 13.5px; line-height: 1.9; color: #cfe0f5; overflow-x: auto; }
+  .cli .c { color: var(--cyan); }
+  .cli .o { color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); margin-top: 40px; }
+  .foot { max-width: 1080px; margin: 0 auto; padding: 30px; display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; flex-wrap: wrap; gap: 14px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .visual::before, .corner { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/"><span class="logo">🐳</span> SuiDrop</a>
+    <div class="links">
+      <a href="#top">Home</a>
+      <a href="#how">How it works</a>
+      <a href="#explorer">Explorer</a>
+      <a href="#cli">CLI</a>
+      <a class="cta" href="/app">Launch app</a>
+    </div>
+  </nav>
+
+  <div id="top" class="hero">
+    <div>
+      <span class="pill"><span class="dot"></span> Trustless file transfer · Sui + Walrus</span>
+      <h1>Send files only the <span class="grad">link</span> can open.</h1>
+      <p class="lede">SuiDrop encrypts your file in the browser, stores it on Walrus decentralized storage, and anchors a verifiable receipt on Sui. No server ever sees your file or your key.</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="/app">Launch app →</a>
+        <a class="btn-ghost" href="#how">How it works</a>
+      </div>
+      <div class="trust">
+        <span><b>AES-256</b> in-browser</span>
+        <span>Stored on <b>Walrus</b></span>
+        <span>Verified on <b>Sui</b></span>
+      </div>
+    </div>
+
+    <div class="visual">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="receipt">
+        <div class="rhead">
+          <span class="verified">⛓️ Verified on Sui</span>
+          <span class="chip">testnet</span>
+        </div>
+        <div class="file">
+          <span class="ic">🔒</span>
+          <span>quarterly-report.pdf</span>
+        </div>
+        <div class="rrow"><span>Sender</span><b>0xf19e…749b</b></div>
+        <div class="rrow"><span>Recipient</span><b>anyone with link</b></div>
+        <div class="rrow"><span>Stored on</span><b>Walrus</b></div>
+        <div class="rrow"><span>Receipt</span><b>0xdea4…a5b8</b></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="eyebrow">How it works</div>
+    <h2 class="h2">Four steps. Zero trust required.</h2>
+    <p class="ssub">Every step happens client-side or on-chain. The backend only relays encrypted bytes it cannot read.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <h3>Encrypt locally</h3>
+        <p>Your file is encrypted with AES-256-GCM in your browser. The key never leaves your device.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <h3>Store on Walrus</h3>
+        <p>The ciphertext is uploaded to Walrus decentralized storage on Sui and gets a blob id.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <h3>Anchor on Sui</h3>
+        <p>Your wallet signs a Move call minting an on-chain receipt: sender, blob, time, all verifiable.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div>
+        <h3>Share a link</h3>
+        <p>The decryption key rides in the link fragment. Only someone with the link can open the file.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="explorer">
+    <div class="eyebrow">Explorer</div>
+    <h2 class="h2">Every drop, on-chain.</h2>
+    <p class="ssub">SuiDrop receipts are public objects on Sui. The explorer reads them through Tatum RPC, no separate database.</p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="statDrops">—</div><div class="k">Total drops anchored</div></div>
+      <div class="stat"><div class="v" id="statFiles">—</div><div class="k">Files sent</div></div>
+      <div class="stat"><div class="v" id="statSize">—</div><div class="k">Total size on protocol</div></div>
+    </div>
+    <p class="explorer-note">Live transaction feed coming next. Stats are aggregated from <b>DropCreated</b> events via Tatum RPC.</p>
+  </section>
+
+  <section id="cli">
+    <div class="eyebrow">CLI</div>
+    <h2 class="h2">Drop files from your terminal.</h2>
+    <p class="ssub">The same trustless flow, scriptable. Encrypt, store on Walrus, anchor on Sui, get a link.</p>
+    <div class="cli">
+      <div class="top"><i></i><i></i><i></i></div>
+      <pre><span class="o">$</span> suidrop send quarterly-report.pdf
+<span class="o"># encrypting · uploading to Walrus · anchoring on Sui</span>
+<span class="c">✓ https://suidrop.xyz/app?d=Dcp42W9t…&amp;r=0xdea4…#aWOVm…</span>
+
+<span class="o">$</span> suidrop get "https://suidrop.xyz/app?d=…#…"
+<span class="c">✓ verified on Sui · decrypted · saved quarterly-report.pdf</span></pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot">
+      <span>SuiDrop · trustless encrypted file transfer</span>
+      <span>Stored on <b style="color:var(--ink)">Walrus</b> · anchored on <b style="color:var(--ink)">Sui</b> · powered by <b style="color:var(--ink)">Tatum</b></span>
+    </div>
+  </footer>
+
+<script>
+  const p = new URLSearchParams(location.search);
+  if (p.get("d")) location.replace("/app" + location.search + location.hash);
+</script>
+</body>
+</html>

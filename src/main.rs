@@ -1,13 +1,3 @@
-//! SuiDrop — trustless, end-to-end encrypted file transfer on Walrus + Sui.
-//!
-//! This thin backend exists for three reasons:
-//!   1. Hide the Tatum API key (it must never reach the browser).
-//!   2. Throttle Sui RPC to stay inside Tatum's free-tier limit (3 RPS / 100K credits).
-//!   3. Proxy Walrus publisher/aggregator so the frontend talks to one origin.
-//!
-//! Encryption happens entirely in the browser; the server never sees plaintext
-//! or the decryption key.
-
 use std::{
     net::SocketAddr,
     sync::Arc,
@@ -30,9 +20,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-/// Max upload size we accept from the browser (encrypted blob). 100 MiB.
 const MAX_BODY: usize = 100 * 1024 * 1024;
-/// Minimum spacing between Sui RPC calls to Tatum. ~3 RPS free-tier ceiling.
 const RPC_MIN_INTERVAL: Duration = Duration::from_millis(350);
 
 #[derive(Clone)]
@@ -44,7 +32,6 @@ struct Config {
     walrus_aggregator: String,
     epochs: u32,
     port: u16,
-    /// Published Move package id holding the `receipt` module. Empty until deployed.
     package_id: String,
 }
 
@@ -52,7 +39,6 @@ struct Config {
 struct AppState {
     cfg: Config,
     http: reqwest::Client,
-    /// Serializes outbound RPC so we never breach Tatum's rate limit.
     rpc_gate: Arc<Mutex<Instant>>,
 }
 
@@ -69,7 +55,6 @@ fn resolve_config() -> Config {
 
     let rpc_url = format!("https://sui-{network}.gateway.tatum.io");
 
-    // Walrus runs on testnet and mainnet only; devnet falls back to testnet Walrus.
     let (def_pub, def_agg) = match network.as_str() {
         "mainnet" => (
             "https://publisher.walrus-mainnet.walrus.space",
@@ -85,7 +70,8 @@ fn resolve_config() -> Config {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(5);
-    let port = std::env::var("SUIDROP_PORT")
+    let port = std::env::var("PORT")
+        .or_else(|_| std::env::var("SUIDROP_PORT"))
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(8080);
@@ -102,7 +88,6 @@ fn resolve_config() -> Config {
     }
 }
 
-/// Non-secret config the frontend is allowed to know.
 async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(json!({
         "network": s.cfg.network,
@@ -112,9 +97,7 @@ async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
     }))
 }
 
-/// Throttled JSON-RPC proxy to Tatum. The API key is injected here, server-side.
 async fn rpc_proxy(State(s): State<AppState>, body: Bytes) -> Response {
-    // Rate gate: hold the lock across the sleep so calls strictly serialize.
     {
         let mut last = s.rpc_gate.lock().await;
         let elapsed = last.elapsed();
@@ -145,7 +128,6 @@ async fn rpc_proxy(State(s): State<AppState>, body: Bytes) -> Response {
     }
 }
 
-/// Store an (already-encrypted) blob on Walrus via the publisher.
 async fn walrus_upload(State(s): State<AppState>, body: Bytes) -> Response {
     let url = format!(
         "{}/v1/blobs?epochs={}",
@@ -172,7 +154,6 @@ async fn walrus_upload(State(s): State<AppState>, body: Bytes) -> Response {
     }
 }
 
-/// Fetch a blob back from the Walrus aggregator by blob id.
 async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> Response {
     let url = format!(
         "{}/v1/blobs/{}",
@@ -200,9 +181,6 @@ async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> R
     }
 }
 
-/// Rewrite esm.sh's absolute import specifiers (`/@scope/...`) so they stay
-/// under our `/esm/` proxy prefix. Relative specifiers (`./x.mjs`) are left
-/// alone — they already resolve correctly against the proxied module URL.
 fn rewrite_esm(src: &str) -> String {
     src.replace("from\"/", "from\"/esm/")
         .replace("from \"/", "from \"/esm/")
@@ -211,8 +189,6 @@ fn rewrite_esm(src: &str) -> String {
         .replace("import(\"/", "import(\"/esm/")
 }
 
-/// Same-origin proxy to esm.sh. Lets the plain-HTML frontend `import` the
-/// Mysten SDK / wallet-standard without CDN CORS/MIME headaches.
 async fn esm_proxy(
     State(s): State<AppState>,
     Path(path): Path<String>,
@@ -270,7 +246,7 @@ async fn main() {
 
     let cfg = resolve_config();
     if cfg.tatum_api_key.is_empty() {
-        tracing::warn!("TATUM_API_KEY is empty — RPC proxy calls will fail. Set it in .env");
+        tracing::warn!("TATUM_API_KEY is empty. RPC proxy calls will fail. Set it in .env");
     }
 
     let state = AppState {
@@ -279,15 +255,15 @@ async fn main() {
         cfg: cfg.clone(),
     };
 
-    let frontend = ServeDir::new("frontend").fallback(ServeFile::new("frontend/index.html"));
-
     let app = Router::new()
         .route("/api/config", get(config_handler))
         .route("/api/rpc", post(rpc_proxy))
         .route("/api/walrus/upload", post(walrus_upload))
         .route("/api/walrus/blob/:id", get(walrus_download))
         .route("/esm/*path", get(esm_proxy))
-        .fallback_service(frontend)
+        .route_service("/", ServeFile::new("frontend/landing.html"))
+        .route_service("/app", ServeFile::new("frontend/app.html"))
+        .fallback_service(ServeDir::new("frontend"))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
@@ -295,7 +271,7 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], cfg.port));
     tracing::info!(
-        "SuiDrop listening on http://{addr}  (network: {}, walrus: {})",
+        "SuiDrop listening on http://{addr} (network: {}, walrus: {})",
         cfg.network,
         cfg.walrus_publisher
     );

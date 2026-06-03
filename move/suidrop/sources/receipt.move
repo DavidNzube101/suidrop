@@ -1,37 +1,19 @@
-/// SuiDrop on-chain receipts.
-///
-/// Each time a file is dropped, the sender mints a `DropReceipt` object that
-/// anchors the Walrus blob id and drop metadata on Sui. The receiver can then
-/// verify the drop trustlessly by reading the object via RPC (Tatum).
-///
-/// Privacy: only a SHA-256 *hash* of the filename is stored on-chain, never the
-/// plaintext name. The decryption key never touches the chain — it lives in the
-/// share-link fragment only.
 module suidrop::receipt {
     use std::string::String;
     use sui::clock::Clock;
     use sui::event;
 
-    /// On-chain proof that a file was dropped via SuiDrop.
     public struct DropReceipt has key, store {
         id: UID,
-        /// Walrus blob id (base64url string) of the encrypted blob.
         blob_id: String,
-        /// Who created the drop.
         sender: address,
-        /// Intended recipient, or @0x0 for "anyone with the link".
         recipient: address,
-        /// Size in bytes of the encrypted blob.
         size: u64,
-        /// SHA-256 hash of the original filename (no plaintext on-chain).
         name_hash: vector<u8>,
-        /// Creation time in epoch milliseconds.
         created_at_ms: u64,
-        /// Walrus storage duration the blob was paid for, in epochs.
         expiry_epochs: u64,
     }
 
-    /// Emitted on every drop so indexers can track activity.
     public struct DropCreated has copy, drop {
         receipt_id: ID,
         blob_id: String,
@@ -40,7 +22,6 @@ module suidrop::receipt {
         created_at_ms: u64,
     }
 
-    /// Mint a receipt for a drop and transfer ownership to the sender.
     entry fun create_receipt(
         blob_id: String,
         recipient: address,
@@ -82,20 +63,17 @@ module suidrop::receipt {
     #[test_only]
     use std::string;
 
-    /// Mint a receipt and assert the sender ends up owning it with the exact
-    /// fields we passed in (including the clock timestamp).
     #[test]
     fun creates_receipt_owned_by_sender() {
         let sender = @0xA11CE;
         let mut scenario = ts::begin(sender);
 
-        // tx 1: create the receipt
         {
             let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
             clock::set_for_testing(&mut clock, 1000);
             create_receipt(
                 string::utf8(b"BLOB_ABC"),
-                @0x0, // open drop: anyone with the link
+                @0x0,
                 42,
                 b"hash-bytes",
                 5,
@@ -105,7 +83,6 @@ module suidrop::receipt {
             clock::destroy_for_testing(clock);
         };
 
-        // tx 2: the receipt should now be owned by the sender
         ts::next_tx(&mut scenario, sender);
         {
             let receipt = ts::take_from_sender<DropReceipt>(&scenario);
@@ -122,7 +99,6 @@ module suidrop::receipt {
         ts::end(scenario);
     }
 
-    /// A drop locked to a specific recipient records that address.
     #[test]
     fun records_named_recipient() {
         let sender = @0xA11CE;

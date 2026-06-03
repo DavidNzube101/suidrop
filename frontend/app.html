@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
-  /* register the rotating angle so the border glint can animate */
   @property --glint { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 
   :root {
@@ -37,7 +36,7 @@
     padding: 18px 26px; border-bottom: 1px solid var(--line);
     backdrop-filter: blur(3px);
   }
-  .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; color: var(--ink); text-decoration: none; }
   .logo {
     width: 34px; height: 34px; display: grid; place-items: center; font-size: 17px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #021016;
@@ -53,7 +52,6 @@
 
   main { flex: 1; display: grid; place-items: center; padding: 34px 20px; }
 
-  /* ---- sharp animated frame ---- */
   .frame { position: relative; width: 100%; max-width: 560px; padding: 1px; }
   .frame::before {
     content: ""; position: absolute; inset: 0; padding: 1px; pointer-events: none; z-index: 2;
@@ -157,17 +155,16 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span class="logo">🐳</span> SuiDrop</div>
+    <a class="brand" href="/"><span class="logo">🐳</span> SuiDrop</a>
     <div class="net"><svg class="globe" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/></svg><b id="net">…</b></div>
   </header>
 
   <main>
-    <!-- SEND -->
     <div class="frame" id="sendFrame">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
       <section class="card" id="send">
         <h1>Send a file, trustlessly</h1>
-        <p class="sub">Encrypted in your browser, stored on <b>Walrus</b> decentralized storage, anchored on <b>Sui</b>. The decryption key lives only in the link — the server never sees it.</p>
+        <p class="sub">Encrypted in your browser, stored on <b>Walrus</b> decentralized storage, anchored on <b>Sui</b>. The decryption key lives only in the link, the server never sees it.</p>
 
         <label class="drop" id="drop">
           <div class="big" id="dropTitle">Drop a file or click to choose</div>
@@ -180,7 +177,7 @@
         <div class="status" id="sendStatus"></div>
 
         <div class="result" id="result">
-          <div class="meta"><span class="lock">🔒</span> <span>Share link — the key rides in the <code>#</code> part:</span></div>
+          <div class="meta"><span class="lock">🔒</span> <span>Share link, the key rides in the <code>#</code> part:</span></div>
           <div class="field">
             <input id="shareLink" readonly />
             <button id="copyBtn" class="ghost">Copy</button>
@@ -203,7 +200,6 @@
       </section>
     </div>
 
-    <!-- RECEIVE -->
     <div class="frame" id="receiveFrame" style="display:none">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
       <section class="card" id="receive">
@@ -244,7 +240,6 @@ const dec = new TextDecoder();
 
 let CFG = { network: "testnet", epochs: 5, packageId: "", chain: "sui:testnet" };
 
-/* ---------- base64url ---------- */
 function b64url(bytes) {
   const a = new Uint8Array(bytes); let s = "";
   for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
@@ -267,13 +262,11 @@ function fmtSize(n) {
 }
 function shortAddr(a) { return a ? a.slice(0, 6) + "…" + a.slice(-4) : ""; }
 
-/* ---------- config ---------- */
 (async () => {
   try { CFG = await (await fetch("/api/config")).json(); } catch (_) {}
   $("net").textContent = CFG.network || "offline";
 })();
 
-/* ================= SEND ================= */
 let chosen = null;
 let lastBlobId = null, lastKeyStr = null, lastEncSize = 0;
 
@@ -293,7 +286,7 @@ function pick(f) {
 }
 
 function buildShareLink(blobId, keyStr, receiptId) {
-  let url = location.origin + "/?d=" + encodeURIComponent(blobId);
+  let url = location.origin + "/app?d=" + encodeURIComponent(blobId);
   if (receiptId) url += "&r=" + encodeURIComponent(receiptId);
   return url + "#" + keyStr;
 }
@@ -342,14 +335,13 @@ $("copyBtn").addEventListener("click", async () => {
   setTimeout(() => ($("copyBtn").textContent = "Copy"), 1400);
 });
 
-/* ---------- anchor on Sui (browser wallet) ---------- */
 $("anchorBtn").addEventListener("click", async () => {
   const btn = $("anchorBtn"), st = $("anchorStatus");
   if (!CFG.packageId) { st.className = "status err"; st.textContent = "✕ No package deployed (set SUIDROP_PACKAGE_ID)"; return; }
   btn.disabled = true; st.className = "status";
   try {
     const wallet = findSuiWallet();
-    if (!wallet) throw new Error("No Sui wallet found — install Slush (and switch it to Testnet)");
+    if (!wallet) throw new Error("No Sui wallet found, install Slush and switch it to Testnet");
     st.textContent = "Connecting " + wallet.name + "…";
     const account = await connect(wallet);
 
@@ -380,8 +372,7 @@ $("anchorBtn").addEventListener("click", async () => {
   } finally { btn.disabled = false; }
 });
 
-/* ================= RECEIVE ================= */
-$("sendInstead").addEventListener("click", () => { location.href = "/"; });
+$("sendInstead").addEventListener("click", () => { location.href = "/app"; });
 
 async function verifyReceipt(receiptId, blobId) {
   const box = $("verify"), badge = $("verifyBadge"), detail = $("verifyDetail");
@@ -411,7 +402,7 @@ async function startReceive(blobId, keyStr, receiptId) {
   $("receiveFrame").style.display = "block";
   const st = $("recvStatus");
 
-  if (receiptId) verifyReceipt(receiptId, blobId); // fire-and-forget, uses Tatum RPC
+  if (receiptId) verifyReceipt(receiptId, blobId);
 
   if (!keyStr) { st.className = "status err"; st.textContent = "✕ Missing decryption key in link (#…)"; return; }
   $("rBar").style.display = "block"; $("rBarFill").style.width = "30%";
@@ -449,7 +440,6 @@ async function startReceive(blobId, keyStr, receiptId) {
   };
 }
 
-/* ---------- route ---------- */
 const params = new URLSearchParams(location.search);
 const d = params.get("d");
 if (d) {
