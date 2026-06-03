@@ -4,155 +4,247 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SuiDrop — trustless encrypted file transfer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
+  /* register the rotating angle so the border glint can animate */
+  @property --glint { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
   :root {
-    --bg: #060b14;
-    --panel: #0d1825;
-    --panel-2: #122236;
-    --ink: #e8f0fa;
-    --muted: #7c93ad;
-    --accent: #36d1c4;
+    --bg: #04070d;
+    --panel: #0a121f;
+    --panel-2: #0f1c2e;
+    --ink: #e9f1fb;
+    --muted: #6f8aa6;
+    --accent: #2ee6d6;
     --accent-2: #4a9eff;
-    --danger: #ff6b6b;
-    --line: #1d3047;
-    --radius: 16px;
+    --ok: #59f0a0;
+    --danger: #ff5d6c;
+    --line: #173049;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; border-radius: 0 !important; }
+  html, body { margin: 0; }
   body {
-    margin: 0;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: radial-gradient(1200px 700px at 70% -10%, #0f2236 0%, var(--bg) 55%);
-    color: var(--ink);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); min-height: 100vh; display: flex; flex-direction: column;
+    background: radial-gradient(1100px 720px at 72% -14%, #0b1d30 0%, var(--bg) 60%);
   }
+  ::selection { background: var(--accent); color: #021016; }
+
   header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 20px 28px; border-bottom: 1px solid var(--line);
+    padding: 18px 26px; border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(3px);
   }
-  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
   .logo {
-    width: 34px; height: 34px; border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    display: grid; place-items: center; font-size: 18px;
+    width: 34px; height: 34px; display: grid; place-items: center; font-size: 17px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #021016;
+    box-shadow: 0 0 16px rgba(46,230,214,.5); clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
   }
   .net {
+    display: flex; align-items: center; gap: 7px;
     font-size: 12px; color: var(--muted); border: 1px solid var(--line);
-    padding: 5px 12px; border-radius: 999px; text-transform: capitalize;
+    padding: 6px 12px;
   }
-  .net b { color: var(--accent); }
-  main { flex: 1; display: grid; place-items: center; padding: 32px 20px; }
+  .net b { color: var(--accent); font-weight: 600; }
+  .net .globe { color: var(--accent); display: block; }
+
+  main { flex: 1; display: grid; place-items: center; padding: 34px 20px; }
+
+  /* ---- sharp animated frame ---- */
+  .frame { position: relative; width: 100%; max-width: 560px; padding: 1px; }
+  .frame::before {
+    content: ""; position: absolute; inset: 0; padding: 1px; pointer-events: none; z-index: 2;
+    background: conic-gradient(from var(--glint),
+      transparent 0 62%, var(--accent-2) 78%, var(--accent) 88%, transparent 96%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: glint 4.5s linear infinite;
+  }
+  @keyframes glint { to { --glint: 360deg; } }
+
+  .corner {
+    position: absolute; width: 16px; height: 16px; z-index: 3; pointer-events: none;
+    border: 2px solid var(--accent);
+    filter: drop-shadow(0 0 5px var(--accent));
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; animation-delay: .3s; }
+  .bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; animation-delay: .9s; }
+  .br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; animation-delay: .6s; }
+  @keyframes pulse {
+    0%, 100% { opacity: .45; box-shadow: 0 0 3px var(--accent); }
+    50% { opacity: 1; box-shadow: 0 0 13px var(--accent); }
+  }
+
   .card {
-    width: 100%; max-width: 560px; background: var(--panel);
-    border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 28px; box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+    position: relative; z-index: 1; background: linear-gradient(180deg, rgba(15,28,46,.92), rgba(8,16,28,.95));
+    border: 1px solid var(--line); padding: 30px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.55), inset 0 0 60px rgba(46,230,214,.03);
   }
-  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
-  .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  h1 { margin: 0 0 6px; font-size: 21px; letter-spacing: -.01em; }
+  .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
   .drop {
-    border: 1.5px dashed var(--line); border-radius: var(--radius);
-    padding: 40px 20px; text-align: center; cursor: pointer;
+    position: relative; display: block; border: 1.5px dashed var(--line);
+    padding: 38px 20px; text-align: center; cursor: pointer; overflow: hidden;
     transition: border-color .15s, background .15s;
   }
-  .drop:hover, .drop.hot { border-color: var(--accent); background: var(--panel-2); }
+  .drop:hover, .drop.hot { border-color: var(--accent); background: rgba(46,230,214,.05); }
   .drop .big { font-size: 16px; font-weight: 600; }
   .drop .small { color: var(--muted); font-size: 13px; margin-top: 6px; }
   input[type=file] { display: none; }
+
   button {
-    appearance: none; border: 0; cursor: pointer; font-weight: 600;
-    border-radius: 12px; padding: 13px 18px; font-size: 14px; color: #04121a;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    width: 100%; margin-top: 16px; transition: opacity .15s, transform .05s;
+    position: relative; appearance: none; border: 1px solid transparent; cursor: pointer;
+    font-weight: 600; letter-spacing: 0; padding: 13px 18px; font-size: 14px;
+    color: #021016; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    width: 100%; margin-top: 16px; overflow: hidden;
+    transition: filter .15s, transform .05s;
   }
-  button:hover { opacity: .92; }
+  button::after {
+    content: ""; position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+    transform: skewX(-20deg); transition: left .5s ease;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:hover::after { left: 140%; }
   button:active { transform: translateY(1px); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button:disabled::after { display: none; }
   button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
-  .status { margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .status { margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 18px; font-family: ui-monospace, Menlo, monospace; }
   .status.err { color: var(--danger); }
-  .result { margin-top: 18px; display: none; }
-  .field {
-    display: flex; gap: 8px; margin-top: 8px;
-  }
+  .status.ok { color: var(--ok); }
+  .result, .onchain { margin-top: 18px; display: none; }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--line), transparent); margin: 22px 0 8px; }
+  .label { font-size: 12px; color: var(--accent); letter-spacing: .01em; margin-bottom: 8px; font-weight: 600; }
+  .field { display: flex; gap: 8px; margin-top: 8px; }
   .field input {
-    flex: 1; background: var(--panel-2); border: 1px solid var(--line);
-    color: var(--ink); border-radius: 10px; padding: 11px 12px; font-size: 13px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+    padding: 11px 12px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .field button { width: auto; margin: 0; padding: 0 16px; font-size: 13px; }
-  .meta { display: flex; gap: 10px; align-items: center; margin: 4px 0 2px; }
+  .field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .field button { width: auto; margin: 0; padding: 0 16px; font-size: 12px; }
+  .meta { display: flex; gap: 10px; align-items: center; margin: 4px 0 2px; flex-wrap: wrap; }
   .meta .name { font-weight: 600; }
   .meta .size { color: var(--muted); font-size: 13px; }
   .lock { color: var(--accent); }
-  footer {
-    text-align: center; color: var(--muted); font-size: 12px;
-    padding: 18px; border-top: 1px solid var(--line);
-  }
+  .verify { margin-top: 16px; border: 1px solid var(--line); border-left: 2px solid var(--accent); padding: 14px 16px; background: var(--panel-2); display: none; }
+  .verify.show { display: block; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; letter-spacing: .03em; }
+  .badge.ok { color: var(--ok); }
+  .badge.bad { color: var(--danger); }
+  .kv { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.75; word-break: break-all; font-family: ui-monospace, Menlo, monospace; }
+  .kv b { color: var(--ink); font-weight: 600; }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { color: var(--accent); text-decoration: underline; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px; border-top: 1px solid var(--line); }
   footer b { color: var(--ink); }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
-  .bar { height: 4px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin-top: 14px; display: none; }
-  .bar > i { display: block; height: 100%; width: 30%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width .2s; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 14px; line-height: 1.55; }
+  .bar { height: 3px; background: var(--panel-2); overflow: hidden; margin-top: 14px; display: none; border: 1px solid var(--line); }
+  .bar > i { display: block; height: 100%; width: 30%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s; box-shadow: 0 0 10px var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .frame::before, .corner, button::after { animation: none; transition: none; }
+  }
 </style>
 </head>
 <body>
   <header>
     <div class="brand"><span class="logo">🐳</span> SuiDrop</div>
-    <div class="net">network: <b id="net">…</b></div>
+    <div class="net"><svg class="globe" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/></svg><b id="net">…</b></div>
   </header>
 
   <main>
     <!-- SEND -->
-    <section class="card" id="send">
-      <h1>Send a file, trustlessly</h1>
-      <p class="sub">Your file is encrypted in your browser, stored on <b>Walrus</b> decentralized storage, and shared as a link. The decryption key lives only in the link — our server never sees it.</p>
+    <div class="frame" id="sendFrame">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <section class="card" id="send">
+        <h1>Send a file, trustlessly</h1>
+        <p class="sub">Encrypted in your browser, stored on <b>Walrus</b> decentralized storage, anchored on <b>Sui</b>. The decryption key lives only in the link — the server never sees it.</p>
 
-      <label class="drop" id="drop">
-        <div class="big" id="dropTitle">Drop a file or click to choose</div>
-        <div class="small" id="dropSub">Encrypted locally before it ever leaves your device</div>
-        <input type="file" id="file" />
-      </label>
+        <label class="drop" id="drop">
+          <div class="big" id="dropTitle">Drop a file or click to choose</div>
+          <div class="small" id="dropSub">Encrypted locally before it ever leaves your device</div>
+          <input type="file" id="file" />
+        </label>
 
-      <div class="bar" id="bar"><i id="barFill"></i></div>
-      <button id="sendBtn" disabled>Encrypt &amp; upload to Walrus</button>
-      <div class="status" id="sendStatus"></div>
+        <div class="bar" id="bar"><i id="barFill"></i></div>
+        <button id="sendBtn" disabled>Encrypt &amp; upload to Walrus</button>
+        <div class="status" id="sendStatus"></div>
 
-      <div class="result" id="result">
-        <div class="meta"><span class="lock">🔒</span> <span>Share this link — it carries the key in the <code>#</code> part:</span></div>
-        <div class="field">
-          <input id="shareLink" readonly />
-          <button id="copyBtn" class="ghost">Copy</button>
+        <div class="result" id="result">
+          <div class="meta"><span class="lock">🔒</span> <span>Share link — the key rides in the <code>#</code> part:</span></div>
+          <div class="field">
+            <input id="shareLink" readonly />
+            <button id="copyBtn" class="ghost">Copy</button>
+          </div>
+
+          <div class="onchain" id="onchain">
+            <div class="divider"></div>
+            <div class="label">On-chain receipt · Sui</div>
+            <p class="hint" style="margin-top:2px">Anchor this drop on Sui so the receiver can verify who sent it and when. Optionally lock it to one recipient address.</p>
+            <div class="field">
+              <input id="recipient" placeholder="Recipient Sui address (optional)" />
+            </div>
+            <button id="anchorBtn">🔗 Anchor on Sui (Slush)</button>
+            <div class="status" id="anchorStatus"></div>
+            <div class="kv" id="anchorLinks" style="display:none"></div>
+          </div>
+
+          <p class="hint">Anyone with the link can decrypt &amp; download. The blob lives on Walrus for the configured storage epochs.</p>
         </div>
-        <p class="hint">Anyone with this link can decrypt and download. The key after <code>#</code> is never sent to the server. Blob lives on Walrus for the configured storage epochs.</p>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <!-- RECEIVE -->
-    <section class="card" id="receive" style="display:none">
-      <h1>Someone sent you a file</h1>
-      <p class="sub">It's encrypted. Decryption happens in your browser using the key from the link.</p>
-      <div class="meta">
-        <span class="lock">🔒</span>
-        <span class="name" id="rName">Fetching from Walrus…</span>
-        <span class="size" id="rSize"></span>
-      </div>
-      <div class="bar" id="rBar"><i id="rBarFill"></i></div>
-      <button id="recvBtn" disabled>Decrypt &amp; download</button>
-      <div class="status" id="recvStatus"></div>
-      <button class="ghost" id="sendInstead" style="margin-top:10px">Send a file instead →</button>
-    </section>
+    <div class="frame" id="receiveFrame" style="display:none">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <section class="card" id="receive">
+        <h1>Someone sent you a file</h1>
+        <p class="sub">It's encrypted. Decryption happens in your browser using the key from the link.</p>
+
+        <div class="verify" id="verify">
+          <span class="badge" id="verifyBadge">⛓️ Checking on-chain receipt…</span>
+          <div class="kv" id="verifyDetail"></div>
+        </div>
+
+        <div class="meta" style="margin-top:16px">
+          <span class="lock">🔒</span>
+          <span class="name" id="rName">Fetching from Walrus…</span>
+          <span class="size" id="rSize"></span>
+        </div>
+        <div class="bar" id="rBar"><i id="rBarFill"></i></div>
+        <button id="recvBtn" disabled>Decrypt &amp; download</button>
+        <div class="status" id="recvStatus"></div>
+        <button class="ghost" id="sendInstead" style="margin-top:10px">Send a file instead →</button>
+      </section>
+    </div>
   </main>
 
   <footer>
-    Encrypted in-browser · stored on <b>Walrus</b> · on <b>Sui</b> via <b>Tatum</b> RPC
+    Encrypted in-browser · stored on <b>Walrus</b> · anchored on <b>Sui</b> via <b>Tatum</b> RPC
   </footer>
 
-<script>
+<script type="module">
+import {
+  findSuiWallet, connect, createReceipt, receiptIdFromTx, fetchReceipt,
+  sha256, bytesToHex, explorerBase, ZERO_ADDR,
+} from "./sui.js";
+
 const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-/* ---------- base64url helpers ---------- */
+let CFG = { network: "testnet", epochs: 5, packageId: "", chain: "sui:testnet" };
+
+/* ---------- base64url ---------- */
 function b64url(bytes) {
   const a = new Uint8Array(bytes); let s = "";
   for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
@@ -165,34 +257,32 @@ function unb64url(str) {
   for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
   return a;
 }
-
-/* ---------- Walrus blob id extraction (handles publisher response shapes) ---------- */
 function extractBlobId(j) {
-  return j?.newlyCreated?.blobObject?.blobId
-      || j?.alreadyCertified?.blobId
-      || j?.blobId
-      || null;
+  return j?.newlyCreated?.blobObject?.blobId || j?.alreadyCertified?.blobId || j?.blobId || null;
 }
-
-/* ---------- config badge ---------- */
-(async () => {
-  try { const r = await fetch("/api/config"); const j = await r.json(); $("net").textContent = j.network; }
-  catch (_) { $("net").textContent = "offline"; }
-})();
-
-/* ---------- SEND flow ---------- */
-let chosen = null;
-const drop = $("drop");
-["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("hot"); }));
-["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("hot"); }));
-drop.addEventListener("drop", ev => { if (ev.dataTransfer.files[0]) pick(ev.dataTransfer.files[0]); });
-$("file").addEventListener("change", ev => { if (ev.target.files[0]) pick(ev.target.files[0]); });
-
 function fmtSize(n) {
   if (n < 1024) return n + " B";
   if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
   return (n / 1048576).toFixed(2) + " MB";
 }
+function shortAddr(a) { return a ? a.slice(0, 6) + "…" + a.slice(-4) : ""; }
+
+/* ---------- config ---------- */
+(async () => {
+  try { CFG = await (await fetch("/api/config")).json(); } catch (_) {}
+  $("net").textContent = CFG.network || "offline";
+})();
+
+/* ================= SEND ================= */
+let chosen = null;
+let lastBlobId = null, lastKeyStr = null, lastEncSize = 0;
+
+const drop = $("drop");
+["dragover", "dragenter"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add("hot"); }));
+["dragleave", "drop"].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", (ev) => { if (ev.dataTransfer.files[0]) pick(ev.dataTransfer.files[0]); });
+$("file").addEventListener("change", (ev) => { if (ev.target.files[0]) pick(ev.target.files[0]); });
+
 function pick(f) {
   chosen = f;
   $("dropTitle").textContent = f.name;
@@ -202,21 +292,24 @@ function pick(f) {
   $("sendStatus").textContent = "";
 }
 
+function buildShareLink(blobId, keyStr, receiptId) {
+  let url = location.origin + "/?d=" + encodeURIComponent(blobId);
+  if (receiptId) url += "&r=" + encodeURIComponent(receiptId);
+  return url + "#" + keyStr;
+}
+
 $("sendBtn").addEventListener("click", async () => {
   if (!chosen) return;
   const btn = $("sendBtn"), st = $("sendStatus");
   btn.disabled = true; st.className = "status"; st.textContent = "Encrypting in your browser…";
   $("bar").style.display = "block"; $("barFill").style.width = "25%";
   try {
-    // Build envelope: [4-byte metaLen][metaJSON][fileBytes]
     const fileBytes = new Uint8Array(await chosen.arrayBuffer());
     const metaBytes = enc.encode(JSON.stringify({ name: chosen.name, type: chosen.type || "application/octet-stream", size: chosen.size }));
     const plain = new Uint8Array(4 + metaBytes.length + fileBytes.length);
     new DataView(plain.buffer).setUint32(0, metaBytes.length, false);
-    plain.set(metaBytes, 4);
-    plain.set(fileBytes, 4 + metaBytes.length);
+    plain.set(metaBytes, 4); plain.set(fileBytes, 4 + metaBytes.length);
 
-    // Encrypt AES-GCM 256
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain));
@@ -227,37 +320,100 @@ $("sendBtn").addEventListener("click", async () => {
     $("barFill").style.width = "60%"; st.textContent = "Uploading encrypted blob to Walrus…";
     const res = await fetch("/api/walrus/upload", { method: "POST", headers: { "content-type": "application/octet-stream" }, body: blob });
     if (!res.ok) throw new Error("Walrus upload failed (" + res.status + ")");
-    const j = await res.json();
-    const blobId = extractBlobId(j);
+    const blobId = extractBlobId(await res.json());
     if (!blobId) throw new Error("No blob id returned by Walrus");
 
+    lastBlobId = blobId; lastKeyStr = keyStr; lastEncSize = blob.length;
     $("barFill").style.width = "100%";
-    const link = location.origin + "/?d=" + encodeURIComponent(blobId) + "#" + keyStr;
-    $("shareLink").value = link;
+    $("shareLink").value = buildShareLink(blobId, keyStr, null);
     $("result").style.display = "block";
-    st.textContent = "Done — stored on Walrus. Blob id: " + blobId.slice(0, 12) + "…";
+    $("onchain").style.display = CFG.packageId ? "block" : "none";
+    $("anchorStatus").textContent = ""; $("anchorLinks").style.display = "none"; $("anchorBtn").disabled = false;
+    st.className = "status ok"; st.textContent = "✓ Stored on Walrus · blob " + blobId.slice(0, 12) + "…";
     setTimeout(() => { $("bar").style.display = "none"; $("barFill").style.width = "0%"; }, 600);
   } catch (e) {
-    st.className = "status err"; st.textContent = "✕ " + e.message;
-    $("bar").style.display = "none";
+    st.className = "status err"; st.textContent = "✕ " + e.message; $("bar").style.display = "none";
   } finally { btn.disabled = false; }
 });
 
 $("copyBtn").addEventListener("click", async () => {
   await navigator.clipboard.writeText($("shareLink").value);
   $("copyBtn").textContent = "Copied!";
-  setTimeout(() => $("copyBtn").textContent = "Copy", 1400);
+  setTimeout(() => ($("copyBtn").textContent = "Copy"), 1400);
 });
 
-/* ---------- RECEIVE flow ---------- */
+/* ---------- anchor on Sui (browser wallet) ---------- */
+$("anchorBtn").addEventListener("click", async () => {
+  const btn = $("anchorBtn"), st = $("anchorStatus");
+  if (!CFG.packageId) { st.className = "status err"; st.textContent = "✕ No package deployed (set SUIDROP_PACKAGE_ID)"; return; }
+  btn.disabled = true; st.className = "status";
+  try {
+    const wallet = findSuiWallet();
+    if (!wallet) throw new Error("No Sui wallet found — install Slush (and switch it to Testnet)");
+    st.textContent = "Connecting " + wallet.name + "…";
+    const account = await connect(wallet);
+
+    const recipientRaw = $("recipient").value.trim();
+    const recipient = recipientRaw || ZERO_ADDR;
+    const nameHash = await sha256(chosen.name);
+
+    st.textContent = "Approve the transaction in your wallet…";
+    const digest = await createReceipt({
+      wallet, account, packageId: CFG.packageId, chain: CFG.chain,
+      blobId: lastBlobId, recipient, size: lastEncSize, nameHash, expiryEpochs: CFG.epochs,
+    });
+
+    st.textContent = "Confirming on Sui via Tatum RPC…";
+    const receiptId = await receiptIdFromTx(digest);
+
+    const base = explorerBase(CFG.network);
+    const txLink = `${base}/txblock/${digest}`;
+    let html = `Tx: <a href="${txLink}" target="_blank" rel="noopener">${digest.slice(0, 10)}…</a>`;
+    if (receiptId) {
+      $("shareLink").value = buildShareLink(lastBlobId, lastKeyStr, receiptId);
+      html += `<br>Receipt: <a href="${base}/object/${receiptId}" target="_blank" rel="noopener">${shortAddr(receiptId)}</a> — share link updated ✓`;
+    }
+    $("anchorLinks").innerHTML = html; $("anchorLinks").style.display = "block";
+    st.className = "status ok"; st.textContent = "✓ Anchored on Sui by " + shortAddr(account.address);
+  } catch (e) {
+    st.className = "status err"; st.textContent = "✕ " + (e.message || e);
+  } finally { btn.disabled = false; }
+});
+
+/* ================= RECEIVE ================= */
 $("sendInstead").addEventListener("click", () => { location.href = "/"; });
 
-async function startReceive(blobId, keyStr) {
-  $("send").style.display = "none";
-  $("receive").style.display = "block";
-  const st = $("recvStatus");
-  if (!keyStr) { st.className = "status err"; st.textContent = "✕ Missing decryption key in link (#…)"; return; }
+async function verifyReceipt(receiptId, blobId) {
+  const box = $("verify"), badge = $("verifyBadge"), detail = $("verifyDetail");
+  box.classList.add("show");
+  try {
+    const f = await fetchReceipt(receiptId);
+    if (!f) throw new Error("not found");
+    const match = f.blob_id === blobId;
+    badge.className = "badge " + (match ? "ok" : "bad");
+    badge.textContent = match ? "⛓️ Verified on Sui" : "⚠️ Receipt blob mismatch";
+    const base = explorerBase(CFG.network);
+    const when = f.created_at_ms ? new Date(Number(f.created_at_ms)).toLocaleString() : "—";
+    detail.innerHTML =
+      `Sender: <b>${shortAddr(f.sender)}</b><br>` +
+      (f.recipient && f.recipient !== ZERO_ADDR ? `Recipient: <b>${shortAddr(f.recipient)}</b><br>` : `Recipient: <b>anyone with link</b><br>`) +
+      `Created: <b>${when}</b><br>` +
+      `Receipt: <a href="${base}/object/${receiptId}" target="_blank" rel="noopener">${shortAddr(receiptId)}</a>`;
+  } catch (e) {
+    badge.className = "badge bad";
+    badge.textContent = "⚠️ Could not verify receipt";
+    detail.textContent = String(e.message || e);
+  }
+}
 
+async function startReceive(blobId, keyStr, receiptId) {
+  $("sendFrame").style.display = "none";
+  $("receiveFrame").style.display = "block";
+  const st = $("recvStatus");
+
+  if (receiptId) verifyReceipt(receiptId, blobId); // fire-and-forget, uses Tatum RPC
+
+  if (!keyStr) { st.className = "status err"; st.textContent = "✕ Missing decryption key in link (#…)"; return; }
   $("rBar").style.display = "block"; $("rBarFill").style.width = "30%";
   let decrypted = null, meta = null;
   try {
@@ -278,7 +434,7 @@ async function startReceive(blobId, keyStr) {
     $("rName").textContent = meta.name;
     $("rSize").textContent = fmtSize(decrypted.length);
     $("recvBtn").disabled = false;
-    st.textContent = "Decrypted locally. Ready to save.";
+    st.className = "status ok"; st.textContent = "Decrypted locally. Ready to save.";
     setTimeout(() => { $("rBar").style.display = "none"; $("rBarFill").style.width = "0%"; }, 600);
   } catch (e) {
     st.className = "status err"; st.textContent = "✕ " + e.message + " (wrong key or expired blob?)";
@@ -293,10 +449,14 @@ async function startReceive(blobId, keyStr) {
   };
 }
 
-/* ---------- route: ?d=<blobId>#<key> means receive ---------- */
+/* ---------- route ---------- */
 const params = new URLSearchParams(location.search);
 const d = params.get("d");
-if (d) startReceive(d, location.hash ? location.hash.slice(1) : "");
+if (d) {
+  fetch("/api/config").then((r) => r.json()).then((c) => { CFG = c; $("net").textContent = c.network; })
+    .catch(() => {})
+    .finally(() => startReceive(d, location.hash ? location.hash.slice(1) : "", params.get("r")));
+}
 </script>
 </body>
 </html>

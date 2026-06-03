@@ -16,7 +16,7 @@ use std::{
 
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, RawQuery, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -44,6 +44,8 @@ struct Config {
     walrus_aggregator: String,
     epochs: u32,
     port: u16,
+    /// Published Move package id holding the `receipt` module. Empty until deployed.
+    package_id: String,
 }
 
 #[derive(Clone)]
@@ -96,6 +98,7 @@ fn resolve_config() -> Config {
         walrus_aggregator: env_or("WALRUS_AGGREGATOR", def_agg),
         epochs,
         port,
+        package_id: std::env::var("SUIDROP_PACKAGE_ID").unwrap_or_default(),
     }
 }
 
@@ -104,6 +107,8 @@ async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(json!({
         "network": s.cfg.network,
         "epochs": s.cfg.epochs,
+        "packageId": s.cfg.package_id,
+        "chain": format!("sui:{}", s.cfg.network),
     }))
 }
 
@@ -195,6 +200,64 @@ async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> R
     }
 }
 
+/// Rewrite esm.sh's absolute import specifiers (`/@scope/...`) so they stay
+/// under our `/esm/` proxy prefix. Relative specifiers (`./x.mjs`) are left
+/// alone — they already resolve correctly against the proxied module URL.
+fn rewrite_esm(src: &str) -> String {
+    src.replace("from\"/", "from\"/esm/")
+        .replace("from \"/", "from \"/esm/")
+        .replace("import\"/", "import\"/esm/")
+        .replace("import \"/", "import \"/esm/")
+        .replace("import(\"/", "import(\"/esm/")
+}
+
+/// Same-origin proxy to esm.sh. Lets the plain-HTML frontend `import` the
+/// Mysten SDK / wallet-standard without CDN CORS/MIME headaches.
+async fn esm_proxy(
+    State(s): State<AppState>,
+    Path(path): Path<String>,
+    RawQuery(q): RawQuery,
+) -> Response {
+    let mut url = format!("https://esm.sh/{path}");
+    if let Some(q) = q.filter(|q| !q.is_empty()) {
+        url.push('?');
+        url.push_str(&q);
+    }
+
+    match s.http.get(&url).send().await {
+        Ok(r) => {
+            let status =
+                StatusCode::from_u16(r.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let ct = r
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/javascript")
+                .to_string();
+            let body = r.bytes().await.unwrap_or_default();
+
+            if ct.contains("javascript") || ct.contains("typescript") {
+                let rewritten = rewrite_esm(&String::from_utf8_lossy(&body));
+                (
+                    status,
+                    [
+                        (
+                            header::CONTENT_TYPE,
+                            "application/javascript; charset=utf-8",
+                        ),
+                        (header::CACHE_CONTROL, "public, max-age=86400"),
+                    ],
+                    rewritten,
+                )
+                    .into_response()
+            } else {
+                (status, [(header::CONTENT_TYPE, ct)], body).into_response()
+            }
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("esm proxy error: {e}")).into_response(),
+    }
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -223,6 +286,7 @@ async fn main() {
         .route("/api/rpc", post(rpc_proxy))
         .route("/api/walrus/upload", post(walrus_upload))
         .route("/api/walrus/blob/:id", get(walrus_download))
+        .route("/esm/*path", get(esm_proxy))
         .fallback_service(frontend)
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .layer(CorsLayer::permissive())

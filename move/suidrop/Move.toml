@@ -1,0 +1,10 @@
+[package]
+name = "suidrop"
+edition = "2024.beta"
+version = "0.1.0"
+
+# The Sui framework (and MoveStdlib) are auto-added and version-matched to your
+# installed toolchain, so we don't pin them explicitly here.
+
+[addresses]
+suidrop = "0x0"
