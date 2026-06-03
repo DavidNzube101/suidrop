@@ -12,7 +12,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use tokio::sync::Mutex;
 use tower_http::{
     cors::CorsLayer,
@@ -35,11 +35,14 @@ struct Config {
     package_id: String,
 }
 
+type ExplorerCache = Arc<Mutex<Option<(Instant, Value)>>>;
+
 #[derive(Clone)]
 struct AppState {
     cfg: Config,
     http: reqwest::Client,
     rpc_gate: Arc<Mutex<Instant>>,
+    explorer_cache: ExplorerCache,
 }
 
 fn env_or(key: &str, default: &str) -> String {
@@ -234,6 +237,96 @@ async fn esm_proxy(
     }
 }
 
+async fn tatum_call(s: &AppState, method: &str, params: Value) -> Option<Value> {
+    {
+        let mut last = s.rpc_gate.lock().await;
+        let elapsed = last.elapsed();
+        if elapsed < RPC_MIN_INTERVAL {
+            tokio::time::sleep(RPC_MIN_INTERVAL - elapsed).await;
+        }
+        *last = Instant::now();
+    }
+    let body = json!({ "id": 1, "jsonrpc": "2.0", "method": method, "params": params });
+    let resp = s
+        .http
+        .post(&s.cfg.rpc_url)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::ACCEPT, "application/json")
+        .header("x-api-key", &s.cfg.tatum_api_key)
+        .json(&body)
+        .send()
+        .await
+        .ok()?;
+    resp.json().await.ok()
+}
+
+async fn explorer_handler(State(s): State<AppState>) -> impl IntoResponse {
+    if s.cfg.package_id.is_empty() {
+        return Json(json!({ "drops": 0, "files": 0, "totalSize": 0, "recent": [] }));
+    }
+
+    {
+        let cache = s.explorer_cache.lock().await;
+        if let Some((at, value)) = cache.as_ref() {
+            if at.elapsed() < Duration::from_secs(60) {
+                return Json(value.clone());
+            }
+        }
+    }
+
+    let event_type = format!("{}::receipt::DropCreated", s.cfg.package_id);
+    let mut cursor = Value::Null;
+    let mut drops: u64 = 0;
+    let mut total: u64 = 0;
+    let mut recent: Vec<Value> = Vec::new();
+    let mut pages = 0;
+
+    loop {
+        let params = json!([{ "MoveEventType": event_type }, cursor, 50, true]);
+        let res = match tatum_call(&s, "suix_queryEvents", params).await {
+            Some(r) => r,
+            None => break,
+        };
+        let result = &res["result"];
+        let data = result["data"].as_array().cloned().unwrap_or_default();
+
+        for e in &data {
+            let pj = &e["parsedJson"];
+            let size = pj["size"]
+                .as_str()
+                .and_then(|x| x.parse::<u64>().ok())
+                .unwrap_or(0);
+            drops += 1;
+            total = total.saturating_add(size);
+            if recent.len() < 30 {
+                recent.push(json!({
+                    "sender": pj["sender"],
+                    "recipient": pj["recipient"],
+                    "blobId": pj["blob_id"],
+                    "receiptId": pj["receipt_id"],
+                    "size": size,
+                    "createdAtMs": pj["created_at_ms"],
+                    "txDigest": e["id"]["txDigest"],
+                }));
+            }
+        }
+
+        pages += 1;
+        let has_next = result["hasNextPage"].as_bool().unwrap_or(false);
+        if !has_next || pages >= 20 {
+            break;
+        }
+        cursor = result["nextCursor"].clone();
+    }
+
+    let out = json!({ "drops": drops, "files": drops, "totalSize": total, "recent": recent });
+    {
+        let mut cache = s.explorer_cache.lock().await;
+        *cache = Some((Instant::now(), out.clone()));
+    }
+    Json(out)
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -252,6 +345,7 @@ async fn main() {
     let state = AppState {
         http: reqwest::Client::new(),
         rpc_gate: Arc::new(Mutex::new(Instant::now() - RPC_MIN_INTERVAL)),
+        explorer_cache: Arc::new(Mutex::new(None)),
         cfg: cfg.clone(),
     };
 
@@ -260,6 +354,7 @@ async fn main() {
         .route("/api/rpc", post(rpc_proxy))
         .route("/api/walrus/upload", post(walrus_upload))
         .route("/api/walrus/blob/:id", get(walrus_download))
+        .route("/api/explorer", get(explorer_handler))
         .route("/esm/*path", get(esm_proxy))
         .route_service("/", ServeFile::new("frontend/landing.html"))
         .route_service("/app", ServeFile::new("frontend/app.html"))

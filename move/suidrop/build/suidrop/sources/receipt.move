@@ -19,6 +19,7 @@ module suidrop::receipt {
         blob_id: String,
         sender: address,
         recipient: address,
+        size: u64,
         created_at_ms: u64,
     }
 
@@ -50,6 +51,7 @@ module suidrop::receipt {
             blob_id: receipt.blob_id,
             sender,
             recipient,
+            size,
             created_at_ms: now,
         });
 

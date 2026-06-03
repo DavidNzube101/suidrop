@@ -122,6 +122,15 @@
   .stat .k { color: var(--muted); font-size: 14px; margin-top: 6px; }
   .note { margin-top: 22px; color: var(--muted); font-size: 13.5px; }
   .note b { color: var(--ink); }
+  .feed { max-width: 760px; width: 100%; margin: 24px auto 0; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(8px); text-align: left; max-height: 280px; overflow-y: auto; }
+  .feed-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 16px; align-items: center; padding: 13px 16px; border-top: 1px solid rgba(120,165,225,.08); font-size: 13px; }
+  .feed-row:first-child { border-top: 0; }
+  .feed-row .who { font-family: var(--mono); color: var(--ink); font-size: 12.5px; }
+  .feed-row .who small { color: var(--muted); display: block; font-family: "Geist", sans-serif; font-size: 11px; margin-top: 2px; }
+  .feed-row .sz { color: var(--blue-soft); font-family: var(--mono); font-size: 12px; }
+  .feed-row .tm { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .feed-row a { color: var(--blue); font-size: 12px; white-space: nowrap; }
+  .feed-empty { padding: 22px; color: var(--muted); font-size: 13px; text-align: center; }
 
   .cli { border: 1px solid var(--line); background: rgba(4,11,22,.7); backdrop-filter: blur(8px); margin-top: 38px; max-width: 720px; width: 100%; text-align: left; }
   .cli .top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
@@ -205,7 +214,8 @@
         <div class="stat"><div class="v" id="statFiles">—</div><div class="k">Files sent</div></div>
         <div class="stat"><div class="v" id="statSize">—</div><div class="k">Total size on protocol</div></div>
       </div>
-      <p class="note">Live transaction feed coming next. Stats aggregate from <b>DropCreated</b> events via Tatum RPC.</p>
+      <p class="note">Stats and feed aggregate from <b>DropCreated</b> events on Sui, read live via Tatum RPC.</p>
+      <div class="feed" id="feed"><div class="feed-empty">Loading drops…</div></div>
     </section>
 
     <section class="view" id="view-cli">
