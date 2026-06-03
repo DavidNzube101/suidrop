@@ -237,6 +237,7 @@
 <script>
   const views = ["home", "how", "explorer", "cli"];
   const triggers = document.querySelectorAll("[data-view]");
+  let explorerLoaded = false;
 
   function show(view) {
     if (!views.includes(view)) view = "home";
@@ -244,6 +245,47 @@
     document.getElementById("view-" + view).classList.add("active");
     document.querySelectorAll(".navlinks a").forEach((a) => a.classList.toggle("active", a.dataset.view === view));
     history.replaceState(null, "", view === "home" ? "/" : "#" + view);
+    if (view === "explorer" && !explorerLoaded) { explorerLoaded = true; loadExplorer(); }
+  }
+
+  function shortAddr(a) { return a ? a.slice(0, 6) + "…" + a.slice(-4) : "—"; }
+  function fmtSize(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    if (n < 1073741824) return (n / 1048576).toFixed(2) + " MB";
+    return (n / 1073741824).toFixed(2) + " GB";
+  }
+  function fmtAgo(ms) {
+    const s = Math.max(1, Math.floor((Date.now() - Number(ms)) / 1000));
+    if (s < 60) return s + "s ago";
+    if (s < 3600) return Math.floor(s / 60) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    return Math.floor(s / 86400) + "d ago";
+  }
+  function explorerBase(net) { return net === "mainnet" ? "https://suivision.xyz" : `https://${net}.suivision.xyz`; }
+
+  async function loadExplorer() {
+    const feed = document.getElementById("feed");
+    try {
+      const cfg = await (await fetch("/api/config")).json();
+      const data = await (await fetch("/api/explorer")).json();
+      document.getElementById("statDrops").textContent = data.drops ?? 0;
+      document.getElementById("statFiles").textContent = data.files ?? 0;
+      document.getElementById("statSize").textContent = fmtSize(data.totalSize);
+      const base = explorerBase(cfg.network || "testnet");
+      const rows = data.recent || [];
+      if (!rows.length) { feed.innerHTML = '<div class="feed-empty">No drops yet. Launch the app and send the first one.</div>'; return; }
+      feed.innerHTML = rows.map((r) => `
+        <div class="feed-row">
+          <div class="who">${shortAddr(r.sender)}<small>blob ${String(r.blobId).slice(0, 10)}…</small></div>
+          <div class="sz">${fmtSize(r.size)}</div>
+          <div class="tm">${fmtAgo(r.createdAtMs)}</div>
+          <a href="${base}/object/${r.receiptId}" target="_blank" rel="noopener">receipt ↗</a>
+        </div>`).join("");
+    } catch (e) {
+      feed.innerHTML = '<div class="feed-empty">Could not load explorer.</div>';
+    }
   }
 
   triggers.forEach((t) => t.addEventListener("click", (e) => { e.preventDefault(); show(t.dataset.view); }));
