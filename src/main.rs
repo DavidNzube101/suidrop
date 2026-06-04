@@ -413,7 +413,8 @@ async fn short_redirect(State(s): State<AppState>, Path(code): Path<String>) -> 
     }
 }
 
-const MIGRATIONS: &[(&str, &str)] = &[("0001_init", include_str!("../db/migrations/0001_init.sql"))];
+const MIGRATIONS: &[(&str, &str)] =
+    &[("0001_init", include_str!("../db/migrations/0001_init.sql"))];
 
 async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::raw_sql(
