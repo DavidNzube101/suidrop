@@ -112,6 +112,5 @@ export function bytesToHex(bytes) {
 }
 
 export function explorerBase(network) {
-  if (network === "mainnet") return "https://suivision.xyz";
-  return `https://${network}.suivision.xyz`;
+  return `https://suiscan.xyz/${network}`;
 }

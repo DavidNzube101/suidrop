@@ -276,7 +276,7 @@
     if (s < 86400) return Math.floor(s / 3600) + "h ago";
     return Math.floor(s / 86400) + "d ago";
   }
-  function explorerBase(net) { return net === "mainnet" ? "https://suivision.xyz" : `https://${net}.suivision.xyz`; }
+  function explorerBase(net) { return `https://suiscan.xyz/${net}`; }
 
   async function loadExplorer() {
     const feed = document.getElementById("feed");

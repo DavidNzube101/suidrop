@@ -387,7 +387,7 @@ $("anchorBtn").addEventListener("click", async () => {
     const receiptId = await receiptIdFromTx(digest);
 
     const base = explorerBase(CFG.network);
-    const txLink = `${base}/txblock/${digest}`;
+    const txLink = `${base}/tx/${digest}`;
     let html = `Tx: <a href="${txLink}" target="_blank" rel="noopener">${digest.slice(0, 10)}…</a>`;
     if (receiptId) {
       $("shareLink").value = buildShareLink(lastBlobId, lastKeyStr, receiptId);
