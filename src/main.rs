@@ -8,11 +8,14 @@ use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path, RawQuery, State},
     http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use tokio::sync::Mutex;
 use tower_http::{
     cors::CorsLayer,
@@ -43,6 +46,7 @@ struct AppState {
     http: reqwest::Client,
     rpc_gate: Arc<Mutex<Instant>>,
     explorer_cache: ExplorerCache,
+    db: Option<PgPool>,
 }
 
 fn env_or(key: &str, default: &str) -> String {
@@ -101,6 +105,7 @@ async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
         "epochs": s.cfg.epochs,
         "packageId": s.cfg.package_id,
         "chain": format!("sui:{}", s.cfg.network),
+        "shorten": s.db.is_some(),
     }))
 }
 
@@ -331,6 +336,101 @@ async fn explorer_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(out)
 }
 
+#[derive(Deserialize)]
+struct ShortenReq {
+    path: String,
+}
+
+fn valid_target(p: &str) -> bool {
+    p.starts_with("/app?")
+        && p.len() < 1024
+        && !p.contains("://")
+        && !p.chars().any(|c| c.is_whitespace())
+}
+
+fn gen_code() -> String {
+    use rand::Rng;
+    const CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let mut rng = rand::thread_rng();
+    (0..7)
+        .map(|_| CHARS[rng.gen_range(0..CHARS.len())] as char)
+        .collect()
+}
+
+async fn shorten_handler(State(s): State<AppState>, Json(req): Json<ShortenReq>) -> Response {
+    let pool = match &s.db {
+        Some(p) => p,
+        None => return (StatusCode::NOT_FOUND, "shortening disabled").into_response(),
+    };
+    if !valid_target(&req.path) {
+        return (StatusCode::BAD_REQUEST, "invalid path").into_response();
+    }
+
+    for _ in 0..5 {
+        let code = gen_code();
+        let res = sqlx::query("INSERT INTO links (code, target) VALUES ($1, $2)")
+            .bind(&code)
+            .bind(&req.path)
+            .persistent(false)
+            .execute(pool)
+            .await;
+        match res {
+            Ok(_) => {
+                return Json(json!({ "code": code, "short": format!("/s/{code}") })).into_response()
+            }
+            Err(e) => {
+                let dup = e
+                    .as_database_error()
+                    .map(|d| d.is_unique_violation())
+                    .unwrap_or(false);
+                if !dup {
+                    return (StatusCode::BAD_GATEWAY, "could not store link").into_response();
+                }
+            }
+        }
+    }
+    (StatusCode::INTERNAL_SERVER_ERROR, "could not allocate code").into_response()
+}
+
+async fn short_redirect(State(s): State<AppState>, Path(code): Path<String>) -> Response {
+    let pool = match &s.db {
+        Some(p) => p,
+        None => return (StatusCode::NOT_FOUND, "not found").into_response(),
+    };
+    let row = sqlx::query_scalar::<_, String>("SELECT target FROM links WHERE code = $1")
+        .bind(&code)
+        .persistent(false)
+        .fetch_optional(pool)
+        .await;
+    match row {
+        Ok(Some(target)) if target.starts_with("/app") => Redirect::to(&target).into_response(),
+        Ok(_) => (StatusCode::NOT_FOUND, "link not found").into_response(),
+        Err(_) => (StatusCode::BAD_GATEWAY, "lookup failed").into_response(),
+    }
+}
+
+async fn connect_db() -> Option<PgPool> {
+    let url = std::env::var("DATABASE_URL")
+        .ok()
+        .filter(|u| !u.trim().is_empty())?;
+    match PgPoolOptions::new().max_connections(5).connect(&url).await {
+        Ok(pool) => {
+            let mut migrator = sqlx::migrate!("./db/migrations");
+            migrator.set_locking(false);
+            if let Err(e) = migrator.run(&pool).await {
+                tracing::warn!("migrations failed: {e}. Shortening disabled.");
+                return None;
+            }
+            tracing::info!("link shortening enabled (Postgres connected, migrations applied)");
+            Some(pool)
+        }
+        Err(e) => {
+            tracing::warn!("DATABASE_URL set but connection failed: {e}. Shortening disabled.");
+            None
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -346,10 +446,13 @@ async fn main() {
         tracing::warn!("TATUM_API_KEY is empty. RPC proxy calls will fail. Set it in .env");
     }
 
+    let db = connect_db().await;
+
     let state = AppState {
         http: reqwest::Client::new(),
         rpc_gate: Arc::new(Mutex::new(Instant::now() - RPC_MIN_INTERVAL)),
         explorer_cache: Arc::new(Mutex::new(None)),
+        db,
         cfg: cfg.clone(),
     };
 
@@ -360,6 +463,8 @@ async fn main() {
         .route("/api/walrus/upload", post(walrus_upload))
         .route("/api/walrus/blob/:id", get(walrus_download))
         .route("/api/explorer", get(explorer_handler))
+        .route("/api/shorten", post(shorten_handler))
+        .route("/s/:code", get(short_redirect))
         .route("/esm/*path", get(esm_proxy))
         .route_service("/", ServeFile::new("frontend/landing.html"))
         .route_service("/app", ServeFile::new("frontend/app.html"))

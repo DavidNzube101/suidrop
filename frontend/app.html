@@ -180,6 +180,11 @@
             <button id="copyBtn" class="ghost">Copy</button>
           </div>
 
+          <div id="shortenWrap" style="display:none">
+            <button id="shortenBtn" class="ghost">Shorten link</button>
+            <p class="hint">Short links store the file reference on our server (it is already public on-chain). Your decryption key stays in the link and never reaches the server.</p>
+          </div>
+
           <div class="onchain" id="onchain">
             <div class="divider"></div>
             <div class="label">On-chain receipt · Sui</div>
@@ -317,6 +322,8 @@ $("sendBtn").addEventListener("click", async () => {
     $("barFill").style.width = "100%";
     $("shareLink").value = buildShareLink(blobId, keyStr, null);
     $("result").style.display = "block";
+    $("shortenWrap").style.display = CFG.shorten ? "block" : "none";
+    $("shortenBtn").disabled = false; $("shortenBtn").textContent = "Shorten link";
     $("onchain").style.display = CFG.packageId ? "block" : "none";
     $("anchorStatus").textContent = ""; $("anchorLinks").style.display = "none"; $("anchorBtn").disabled = false;
     st.className = "status ok"; st.textContent = "✓ Stored on Walrus · blob " + blobId.slice(0, 12) + "…";
@@ -330,6 +337,30 @@ $("copyBtn").addEventListener("click", async () => {
   await navigator.clipboard.writeText($("shareLink").value);
   $("copyBtn").textContent = "Copied!";
   setTimeout(() => ($("copyBtn").textContent = "Copy"), 1400);
+});
+
+$("shortenBtn").addEventListener("click", async () => {
+  const btn = $("shortenBtn");
+  const full = $("shareLink").value;
+  if (!full) return;
+  const hashIdx = full.indexOf("#");
+  const frag = hashIdx >= 0 ? full.slice(hashIdx) : "";
+  const noFrag = hashIdx >= 0 ? full.slice(0, hashIdx) : full;
+  let path;
+  try { const u = new URL(noFrag); path = u.pathname + u.search; } catch (_) { return; }
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "Shortening…";
+  try {
+    const res = await fetch("/api/shorten", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) });
+    if (!res.ok) throw new Error("shorten failed (" + res.status + ")");
+    const j = await res.json();
+    $("shareLink").value = location.origin + j.short + frag;
+    btn.textContent = "Shortened ✓";
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+  } catch (e) {
+    btn.textContent = "Failed";
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+  }
 });
 
 $("anchorBtn").addEventListener("click", async () => {
