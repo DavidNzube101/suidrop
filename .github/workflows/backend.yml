@@ -55,29 +55,6 @@ jobs:
             ghcr.io/${{ steps.owner.outputs.value }}/suidrop:latest
             ghcr.io/${{ steps.owner.outputs.value }}/suidrop:${{ github.sha }}
 
-  release:
-    name: Release
-    needs: build-push
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Generate tag
-        id: tag
-        run: echo "value=v$(date +%Y%m%d%H%M)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-      - name: Push tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.tag.outputs.value }}
-          git push origin ${{ steps.tag.outputs.value }}
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.value }}
-          generate_release_notes: true
-
   deploy:
     name: Deploy
     needs: build-push

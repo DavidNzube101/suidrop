@@ -100,7 +100,19 @@ Switching network is one variable. Set `SUIDROP_NETWORK` and the backend picks t
 
 A terminal client that mirrors the web flow. It is a thin client over the provider
 API, so it works against any SuiDrop provider. Encryption and key custody stay
-local. Build it with the `cli` feature:
+local.
+
+Install on Linux or macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DavidNzube101/suidrop/master/install.sh | sh
+```
+
+On Windows, download the matching `.exe` from the releases page. Prebuilt binaries
+for Linux (x86_64, arm64, i686, musl), macOS (x86_64, arm64), and Windows (x86_64,
+i686, arm64) are attached to every release.
+
+Or build from source with the `cli` feature:
 
 ```bash
 cargo build --release --features cli --bin suidrop-cli
@@ -149,6 +161,24 @@ docker run -p 8080:8080 --env-file .env suidrop
 ```
 
 The live deployment runs the same image on Render behind https://suidrop.xyz.
+
+## Versioning and releases
+
+The version in `Cargo.toml` is the single source of truth and follows semver. The
+CLI reports it (`suidrop-cli --version`) from the same value at build time.
+
+To cut a release: bump the version in `Cargo.toml`, commit, then push a matching
+tag.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Pushing a `v*` tag triggers the release workflow, which builds the CLI for every
+platform, attaches the binaries to a GitHub release for that tag, and pushes a
+Docker image tagged with the version. Pushes to `master` continue to build and
+deploy the server image separately.
 
 ## Repository layout
 

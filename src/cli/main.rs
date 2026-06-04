@@ -58,8 +58,9 @@ fn banner() {
 "#;
     println!("{}", style(art).cyan().bold());
     println!(
-        "  {}\n",
-        style("trustless encrypted file transfer on Sui + Walrus").blue()
+        "  {}   {}\n",
+        style("trustless encrypted file transfer on Sui + Walrus").blue(),
+        style(format!("v{}", env!("CARGO_PKG_VERSION"))).dim()
     );
 }
 
@@ -651,9 +652,33 @@ fn with_profile<F: FnOnce(Profile) -> anyhow::Result<()>>(f: F) -> anyhow::Resul
     f(profile)
 }
 
+fn print_help() {
+    println!("suidrop-cli {}", env!("CARGO_PKG_VERSION"));
+    println!("trustless encrypted file transfer on Sui + Walrus");
+    println!();
+    println!("Usage: suidrop-cli [command]");
+    println!();
+    println!("Commands:");
+    println!("  (no command)   open the interactive menu");
+    println!("  setup          configure provider, network, and signing key");
+    println!("  send <file>    encrypt, store on Walrus, optionally anchor, print a link");
+    println!("  get <link>     verify, fetch, decrypt, save");
+    println!("  fund           request testnet gas for the configured address");
+    println!("  version        print the version");
+    println!("  help           print this help");
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let result = match args.get(1).map(|s| s.as_str()) {
+        Some("version") | Some("--version") | Some("-v") => {
+            println!("suidrop-cli {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
+        Some("help") | Some("--help") | Some("-h") => {
+            print_help();
+            Ok(())
+        }
         Some("setup") => run_setup().map(|_| ()),
         Some("send") => with_profile(|p| {
             let path = args
