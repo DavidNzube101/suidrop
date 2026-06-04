@@ -7,30 +7,8 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  docker:
-    name: Build and push Docker image
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Lowercase owner
-        id: owner
-        run: echo "value=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ steps.owner.outputs.value }}/suidrop:latest
-            ghcr.io/${{ steps.owner.outputs.value }}/suidrop:${{ github.ref_name }}
-
   build-cli:
     name: CLI ${{ matrix.artifact }}
     runs-on: ${{ matrix.os }}
@@ -109,7 +87,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [docker, build-cli]
+    needs: [build-cli]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,6 +96,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: suidrop-cli-*
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:

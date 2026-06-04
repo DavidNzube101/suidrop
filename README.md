@@ -176,9 +176,8 @@ git push origin v0.1.0
 ```
 
 Pushing a `v*` tag triggers the release workflow, which builds the CLI for every
-platform, attaches the binaries to a GitHub release for that tag, and pushes a
-Docker image tagged with the version. Pushes to `master` continue to build and
-deploy the server image separately.
+platform and attaches the binaries to a GitHub release for that tag. The server
+Docker image is built and deployed separately on every push to `master`.
 
 ## Repository layout
 
