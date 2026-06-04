@@ -413,15 +413,42 @@ async fn short_redirect(State(s): State<AppState>, Path(code): Path<String>) -> 
     }
 }
 
+const MIGRATIONS: &[(&str, &str)] = &[("0001_init", include_str!("../db/migrations/0001_init.sql"))];
+
+async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
+    sqlx::raw_sql(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
+    )
+    .execute(pool)
+    .await?;
+
+    for (version, sql) in MIGRATIONS {
+        let applied: Option<(String,)> =
+            sqlx::query_as("SELECT version FROM schema_migrations WHERE version = $1")
+                .bind(version)
+                .persistent(false)
+                .fetch_optional(pool)
+                .await?;
+        if applied.is_some() {
+            continue;
+        }
+        sqlx::raw_sql(sql).execute(pool).await?;
+        sqlx::query("INSERT INTO schema_migrations (version) VALUES ($1)")
+            .bind(version)
+            .persistent(false)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
 async fn connect_db() -> Option<PgPool> {
     let url = std::env::var("DATABASE_URL")
         .ok()
         .filter(|u| !u.trim().is_empty())?;
     match PgPoolOptions::new().max_connections(5).connect(&url).await {
         Ok(pool) => {
-            let mut migrator = sqlx::migrate!("./db/migrations");
-            migrator.set_locking(false);
-            if let Err(e) = migrator.run(&pool).await {
+            if let Err(e) = run_migrations(&pool).await {
                 tracing::warn!("migrations failed: {e}. Shortening disabled.");
                 return None;
             }
