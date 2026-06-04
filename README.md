@@ -96,6 +96,37 @@ Open http://localhost:8080. The landing page is at `/` and the app is at `/app`.
 
 Switching network is one variable. Set `SUIDROP_NETWORK` and the backend picks the matching Tatum RPC and Walrus endpoints.
 
+## CLI
+
+A terminal client that mirrors the web flow. It is a thin client over the provider
+API, so it works against any SuiDrop provider. Encryption and key custody stay
+local. Build it with the `cli` feature:
+
+```bash
+cargo build --release --features cli --bin suidrop-cli
+./target/release/suidrop-cli
+```
+
+On first run it walks through setup (provider, network, explorer, auto anchor, and
+an optional signing key that it can generate for you) and saves a profile to your
+config directory. On testnet, if the wallet has no gas it tries the faucet and
+tells you to fund it yourself if that fails.
+
+Commands:
+
+```bash
+suidrop-cli            # interactive menu
+suidrop-cli setup      # re-run setup
+suidrop-cli send FILE  # encrypt, store on Walrus, optionally anchor, print a link
+suidrop-cli get LINK   # verify, fetch, decrypt, save
+suidrop-cli fund       # request testnet gas for the configured address
+```
+
+Links produced by the CLI open in the web app and the reverse, the envelope is the
+same. Anchoring on Sui uses your local `sui` CLI to sign, so it needs `sui`
+installed and a funded address. Everything else (encrypt, Walrus, share, fetch,
+decrypt) needs only the provider.
+
 ## Move contract
 
 The package has one module, `receipt`, with a `DropReceipt` object and a `DropCreated` event.
@@ -122,11 +153,13 @@ The live deployment runs the same image on Render behind https://suidrop.xyz.
 ## Repository layout
 
 ```
-src/main.rs            Rust backend (axum): proxies, RPC throttle, explorer
+src/main.rs            Rust backend (axum): proxies, RPC throttle, explorer, shorten
+src/cli/main.rs        Terminal client (build with --features cli)
 frontend/landing.html  Single page landing with view switching
 frontend/app.html      The send and receive app
 frontend/sui.js        Wallet signing and Tatum RPC reads
 move/suidrop/          Move package (receipt module and tests)
+db/migrations/         Postgres migrations for link shortening
 Dockerfile             Multi stage build
 .github/workflows/     CI: test, build and push, release, deploy
 ```

@@ -99,6 +99,10 @@ async fn health_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(json!({ "status": "ok", "network": s.cfg.network }))
 }
 
+async fn official_network_handler(State(s): State<AppState>) -> impl IntoResponse {
+    Json(json!({ "status": 200, "network": format!("sui-{}", s.cfg.network) }))
+}
+
 async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(json!({
         "network": s.cfg.network,
@@ -458,6 +462,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(health_handler))
+        .route("/api/official-network", get(official_network_handler))
         .route("/api/config", get(config_handler))
         .route("/api/rpc", post(rpc_proxy))
         .route("/api/walrus/upload", post(walrus_upload))

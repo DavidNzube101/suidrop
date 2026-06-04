@@ -2,7 +2,7 @@
 name = "suidrop"
 version = "0.1.0"
 edition = "2021"
-description = "SuiDrop — trustless, end-to-end encrypted file transfer on Walrus + Sui, powered by Tatum."
+description = "SuiDrop, trustless, end-to-end encrypted file transfer on Walrus + Sui, powered by Tatum."
 
 [dependencies]
 axum = { version = "0.7", features = ["macros"] }
@@ -19,6 +19,33 @@ anyhow = "1"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate"] }
 rand = "0.8"
 
+dialoguer = { version = "0.11", optional = true }
+indicatif = { version = "0.17", optional = true }
+console = { version = "0.15", optional = true }
+aes-gcm = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+toml = { version = "0.8", optional = true }
+dirs = { version = "5", optional = true }
+sha2 = { version = "0.10", optional = true }
+
+[features]
+cli = [
+    "dep:dialoguer",
+    "dep:indicatif",
+    "dep:console",
+    "dep:aes-gcm",
+    "dep:base64",
+    "dep:toml",
+    "dep:dirs",
+    "dep:sha2",
+    "reqwest/blocking",
+]
+
 [[bin]]
 name = "suidrop"
 path = "src/main.rs"
+
+[[bin]]
+name = "suidrop-cli"
+path = "src/cli/main.rs"
+required-features = ["cli"]
