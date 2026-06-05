@@ -483,7 +483,7 @@ fn run_setup() -> anyhow::Result<Profile> {
 
     let provider: String = Input::<String>::with_theme(&theme)
         .with_prompt("Provider API base")
-        .default("https://api.suidrop.xyz".to_string())
+        .default("https://suidrop.xyz/api".to_string())
         .interact_text()?;
 
     let suggested = fetch_official_network(&provider).unwrap_or_else(|| "testnet".to_string());

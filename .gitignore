@@ -11,3 +11,7 @@
 *.swp
 .idea/
 .vscode/
+
+# Demo video script (local only)
+SuiDrop-Demo-Video-Script.html
+SuiDrop-Demo-Video-Script.txt
