@@ -19,6 +19,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/suidrop /app/suidrop
 COPY frontend ./frontend
 COPY media ./media
+COPY install.sh ./install.sh
 
 ENV SUIDROP_PORT=8080
 ENV SUIDROP_NETWORK=testnet
