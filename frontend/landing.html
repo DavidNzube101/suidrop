@@ -287,7 +287,7 @@
       <div class="install">
         <div class="install-label">Install on Linux <img class="ic" src="/media/debian.png" alt="" /> or macOS <img class="ic" src="/media/apple.png" alt="" /></div>
         <div class="install-cmd">
-          <code id="installCmd">curl -fsSL https://raw.githubusercontent.com/DavidNzube101/suidrop/master/install.sh | sh</code>
+          <code id="installCmd">curl -fsSL https://suidrop.xyz/install.sh | sh</code>
           <button id="installCopy">Copy</button>
         </div>
         <p class="install-note">On Windows <img class="ic" src="/media/windows.png" alt="" />, grab the <code>.exe</code> from the <a href="https://github.com/DavidNzube101/suidrop/releases" target="_blank" rel="noopener">releases page</a>. Or build from source: <code>cargo build --release --features cli --bin suidrop-cli</code>.</p>
@@ -398,7 +398,7 @@
 What it does: encrypts a file locally with AES-256-GCM, stores the ciphertext on Walrus decentralized storage, optionally anchors a verifiable receipt on Sui, and returns a share link whose decryption key lives only in the URL fragment (after the #) and is never sent to any server.
 
 Install (Linux/macOS):
-  curl -fsSL https://raw.githubusercontent.com/DavidNzube101/suidrop/master/install.sh | sh
+  curl -fsSL https://suidrop.xyz/install.sh | sh
 
 Configure once:
   suidrop-cli setup

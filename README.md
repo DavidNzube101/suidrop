@@ -157,7 +157,7 @@ local.
 Install on Linux or macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DavidNzube101/suidrop/master/install.sh | sh
+curl -fsSL https://suidrop.xyz/install.sh | sh
 ```
 
 On Windows, download the matching `.exe` from the releases page. Prebuilt binaries

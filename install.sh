@@ -66,7 +66,7 @@ if [ -e "$INSTALL_DIR/$BINARY" ]; then
     else
         echo "Error: A file named '$BINARY' already exists in $INSTALL_DIR and is not the SuiDrop CLI."
         echo "Install under a different name by passing it as an argument:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/$REPO/master/install.sh | sh -s -- your-custom-name"
+        echo "  curl -fsSL https://suidrop.xyz/install.sh | sh -s -- your-custom-name"
         exit 1
     fi
 fi

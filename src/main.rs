@@ -499,6 +499,7 @@ async fn main() {
         .route("/api/shorten", post(shorten_handler))
         .route("/s/:code", get(short_redirect))
         .route("/esm/*path", get(esm_proxy))
+        .route_service("/install.sh", ServeFile::new("install.sh"))
         .route_service("/", ServeFile::new("frontend/landing.html"))
         .route_service("/app", ServeFile::new("frontend/app.html"))
         .nest_service("/media", ServeDir::new("media"))
