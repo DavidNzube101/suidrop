@@ -7,9 +7,9 @@ SuiDrop encrypts your file in the browser, stores the ciphertext on Walrus decen
 Built for the Tatum x Build on Sui with Walrus hackathon.
 
 - Live app: https://suidrop.xyz
-- Network: Sui Testnet
-- Move package: `0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9`
-- Package on SuiVision: https://testnet.suivision.xyz/package/0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9
+- Networks: Sui Testnet and Sui Mainnet
+- Testnet Move package: `0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9` ([SuiVision](https://testnet.suivision.xyz/package/0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9))
+- Mainnet Move package: `0x06a89df757475967cd26ca83df85a2861aec5c123807f56d3eff36fdd3cd3a01` ([SuiVision](https://suivision.xyz/package/0x06a89df757475967cd26ca83df85a2861aec5c123807f56d3eff36fdd3cd3a01))
 
 ## Screenshots
 
