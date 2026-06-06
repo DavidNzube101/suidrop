@@ -79,6 +79,10 @@ fn api(provider: &str, path: &str) -> String {
     )
 }
 
+fn api_net(provider: &str, path: &str, network: &str) -> String {
+    format!("{}?network={}", api(provider, path), network)
+}
+
 fn web_base(provider: &str) -> String {
     let p = provider.trim_end_matches('/');
     let p = p.strip_suffix("/api").unwrap_or(p);
@@ -240,7 +244,7 @@ fn keyimport(key: &str) -> anyhow::Result<String> {
 fn balance(profile: &Profile) -> Option<u128> {
     let body = json!({ "id": 1, "jsonrpc": "2.0", "method": "suix_getBalance", "params": [profile.address] });
     let v: Value = http()
-        .post(api(&profile.provider, "rpc"))
+        .post(api_net(&profile.provider, "rpc", &profile.network))
         .json(&body)
         .send()
         .ok()?
@@ -271,35 +275,48 @@ fn maybe_fund(profile: &Profile) {
     pb.finish_and_clear();
     if let Some(b) = bal {
         if b > 0 {
-            println!("  {} {} MIST", style("Balance:").green(), b);
+            println!(
+                "  {} {} MIST  ({})",
+                style("Balance:").green(),
+                b,
+                style(&profile.network).dim()
+            );
             return;
         }
     }
-    println!(
-        "  {}",
-        style("Balance is 0. Requesting testnet funds...").yellow()
-    );
-    let pb = spinner("Asking the faucet...");
-    let ok = request_faucet(&profile.address);
-    pb.finish_and_clear();
-    if ok {
+    if profile.network == "testnet" {
         println!(
             "  {}",
-            style("Faucet request sent. Funds should arrive shortly.").green()
+            style("Balance is 0. Requesting testnet funds...").yellow()
         );
+        let pb = spinner("Asking the faucet...");
+        let ok = request_faucet(&profile.address);
+        pb.finish_and_clear();
+        if ok {
+            println!(
+                "  {}",
+                style("Faucet request sent. Funds should arrive shortly.").green()
+            );
+        } else {
+            println!(
+                "  {}",
+                style("Faucet request failed. Fund this address yourself:").red()
+            );
+            println!("    {}", style(&profile.address).cyan());
+            println!("    {}", style("https://faucet.sui.io").dim());
+        }
     } else {
         println!(
             "  {}",
-            style("Faucet request failed. Fund this address yourself:").red()
+            style("Balance is low on mainnet. Fund this address with SUI:").yellow()
         );
         println!("    {}", style(&profile.address).cyan());
-        println!("    {}", style("https://faucet.sui.io").dim());
-        if profile.auto_anchor {
-            println!(
-                "  {}",
-                style("Heads up: auto-anchoring will fail until the wallet has gas.").yellow()
-            );
-        }
+    }
+    if bal.unwrap_or(0) == 0 && profile.auto_anchor {
+        println!(
+            "  {}",
+            style("Heads up: auto-anchoring will fail until the wallet has gas.").yellow()
+        );
     }
 }
 
@@ -314,11 +331,15 @@ fn anchor(
     }
     let cfg =
         fetch_config(&profile.provider).ok_or_else(|| anyhow::anyhow!("cannot reach provider"))?;
-    let pkg = cfg["packageId"]
+    let pkg = cfg["networks"][profile.network.as_str()]["packageId"]
         .as_str()
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("provider has no package id"))?;
+        .ok_or_else(|| anyhow::anyhow!("no contract deployed on {}", profile.network))?;
     let epochs = cfg["epochs"].as_u64().unwrap_or(5);
+
+    let _ = Command::new("sui")
+        .args(["client", "switch", "--env", &profile.network])
+        .output();
 
     let mut hasher = Sha256::new();
     hasher.update(name.as_bytes());
@@ -388,7 +409,11 @@ fn cmd_send(profile: &Profile, path: &str) -> anyhow::Result<()> {
 
     let pb = spinner("Uploading to Walrus...");
     let resp = http()
-        .post(api(&profile.provider, "walrus/upload"))
+        .post(api_net(
+            &profile.provider,
+            "walrus/upload",
+            &profile.network,
+        ))
         .header("content-type", "application/octet-stream")
         .body(blob.clone())
         .send()?;
@@ -428,6 +453,7 @@ fn cmd_send(profile: &Profile, path: &str) -> anyhow::Result<()> {
     if let Some(r) = &receipt_id {
         link.push_str(&format!("&r={r}"));
     }
+    link.push_str(&format!("&n={}", profile.network));
     link.push('#');
     link.push_str(&key);
 
@@ -453,10 +479,19 @@ fn cmd_get(profile: &Profile, link: &str, out: Option<&str>) -> anyhow::Result<(
         .find(|(k, _)| k.as_ref() == "d")
         .map(|(_, v)| v.into_owned())
         .ok_or_else(|| anyhow::anyhow!("link has no blob id"))?;
+    let net = url
+        .query_pairs()
+        .find(|(k, _)| k.as_ref() == "n")
+        .map(|(_, v)| v.into_owned())
+        .unwrap_or_else(|| profile.network.clone());
 
     let pb = spinner("Fetching from Walrus...");
     let resp = http()
-        .get(api(&profile.provider, &format!("walrus/blob/{blob_id}")))
+        .get(api_net(
+            &profile.provider,
+            &format!("walrus/blob/{blob_id}"),
+            &net,
+        ))
         .send()?;
     pb.finish_and_clear();
     if !resp.status().is_success() {
@@ -486,12 +521,15 @@ fn run_setup() -> anyhow::Result<Profile> {
         .default("https://suidrop.xyz/api".to_string())
         .interact_text()?;
 
-    let suggested = fetch_official_network(&provider).unwrap_or_else(|| "testnet".to_string());
-    let network: String = Input::<String>::with_theme(&theme)
+    let nets = ["mainnet", "testnet"];
+    let suggested = fetch_official_network(&provider).unwrap_or_else(|| "mainnet".to_string());
+    let def_idx = if suggested == "testnet" { 1 } else { 0 };
+    let ni = Select::with_theme(&theme)
         .with_prompt("Network")
-        .default(suggested)
-        .interact_text()?;
-    let network = normalize_network(&network);
+        .items(&nets)
+        .default(def_idx)
+        .interact()?;
+    let network = nets[ni].to_string();
 
     let explorers = ["suiscan", "suivision"];
     let ex = Select::with_theme(&theme)
