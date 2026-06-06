@@ -192,3 +192,9 @@ db/migrations/         Postgres migrations for link shortening
 Dockerfile             Multi stage build
 .github/workflows/     CI: test, build and push, release, deploy
 ```
+
+## Future Work
+
+We have started work on full **Mainnet Walrus Integration** in the `feat/mainnet-support` branch (adding dynamic dual-network routing). 
+
+Currently, the easiest and most user-friendly approach for uploads is to rely on free testnet publishers. However, in our real-world production version, SuiDrop will implement **client-side PTBs (Programmable Transaction Blocks)**. This will allow users to buy Walrus storage directly from their wallet, paying their own storage fees, and seamlessly send the storage object ID to the publisher for trustless execution.
