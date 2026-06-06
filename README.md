@@ -11,6 +11,58 @@ Built for the Tatum x Build on Sui with Walrus hackathon.
 - Move package: `0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9`
 - Package on SuiVision: https://testnet.suivision.xyz/package/0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9
 
+## Architecture Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant SuiDrop Backend
+    participant Walrus Testnet
+    participant Sui Network (Tatum)
+
+    User->>Browser: Select file
+    Browser->>Browser: Encrypt file (AES-256)
+    Browser->>SuiDrop Backend: POST /api/walrus/upload (ciphertext)
+    SuiDrop Backend->>Walrus Testnet: Proxy upload (Testnet Publisher pays storage fee)
+    Walrus Testnet-->>SuiDrop Backend: Return blobId
+    SuiDrop Backend-->>Browser: Return blobId
+    User->>Browser: Click "Anchor on Sui"
+    Browser->>User: Request Wallet Signature
+    User-->>Browser: Sign Transaction (User pays SUI gas fee)
+    Browser->>Sui Network (Tatum): Submit Transaction (Anchoring)
+    Sui Network (Tatum)-->>Browser: Return receiptId
+    Browser->>User: Generate Share Link (key hidden in URL fragment)
+```
+
+### Architecture Workflow (in SuiDrop Mainnet)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Walrus Network
+    participant SuiDrop Backend
+    participant Sui Network (Tatum)
+
+    User->>Browser: Select file
+    Browser->>Browser: Encrypt file (AES-256) & Calculate size
+    Browser->>User: Request Wallet Signature (Buy Storage)
+    User-->>Browser: Sign PTB (User pays SUI/WAL for Storage Object)
+    Browser->>Sui Network (Tatum): Execute PTB
+    Sui Network (Tatum)-->>Browser: Return Storage Object ID
+    Browser->>SuiDrop Backend: POST /api/walrus/upload (ciphertext + Storage Object ID)
+    SuiDrop Backend->>Walrus Network: Proxy upload (using prepaid Storage Object)
+    Walrus Network-->>SuiDrop Backend: Return blobId
+    SuiDrop Backend-->>Browser: Return blobId
+    User->>Browser: Click "Anchor on Sui"
+    Browser->>User: Request Wallet Signature (Receipt)
+    User-->>Browser: Sign Transaction
+    Browser->>Sui Network (Tatum): Submit Transaction (Anchoring)
+    Sui Network (Tatum)-->>Browser: Return receiptId
+    Browser->>User: Generate Share Link (key hidden in URL fragment)
+```
+
 ## Screenshots
 
 ![SuiDrop landing page showing the hero with three overlapping cards: Encrypted locally (AES-256), Stored on Walrus (blob id), and Verified on Sui (sender and receipt).](media/screenshot1.png)
