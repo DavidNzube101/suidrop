@@ -7,9 +7,37 @@ SuiDrop encrypts your file in the browser, stores the ciphertext on Walrus decen
 Built for the Tatum x Build on Sui with Walrus hackathon.
 
 - Live app: https://suidrop.xyz
-- Network: Sui Testnet
-- Move package: `0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9`
-- Package on SuiVision: https://testnet.suivision.xyz/package/0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9
+- Networks: Sui Testnet and Sui Mainnet
+- Testnet Move package: `0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9` ([SuiVision](https://testnet.suivision.xyz/package/0x113d58b1ee1b369eb0beaa3e8b9af52f1e19b0ba7758a8972c51508e5bac0ce9))
+- Mainnet Move package: `0x06a89df757475967cd26ca83df85a2861aec5c123807f56d3eff36fdd3cd3a01` ([SuiVision](https://suivision.xyz/package/0x06a89df757475967cd26ca83df85a2861aec5c123807f56d3eff36fdd3cd3a01))
+
+## Architecture Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Walrus Network
+    participant SuiDrop Backend
+    participant Sui Network (Tatum)
+
+    User->>Browser: Select file
+    Browser->>Browser: Encrypt file (AES-256) & Calculate size
+    Browser->>User: Request Wallet Signature (Buy Storage)
+    User-->>Browser: Sign PTB (Pay SUI/WAL for Storage Object)
+    Browser->>Sui Network (Tatum): Execute PTB
+    Sui Network (Tatum)-->>Browser: Return Storage Object ID
+    Browser->>SuiDrop Backend: POST /api/walrus/upload (ciphertext + Storage Object ID)
+    SuiDrop Backend->>Walrus Network: Proxy upload (using prepaid Storage Object)
+    Walrus Network-->>SuiDrop Backend: Return blobId
+    SuiDrop Backend-->>Browser: Return blobId
+    User->>Browser: Click "Anchor on Sui"
+    Browser->>User: Request Wallet Signature (Receipt)
+    User-->>Browser: Sign Transaction
+    Browser->>Sui Network (Tatum): Submit Transaction (Anchoring)
+    Sui Network (Tatum)-->>Browser: Return receiptId
+    Browser->>User: Generate Share Link (key hidden in URL fragment)
+```
 
 ## Architecture Workflow
 

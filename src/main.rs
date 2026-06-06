@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -6,7 +7,7 @@ use std::{
 
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, Path, RawQuery, State},
+    extract::{DefaultBodyLimit, Path, Query, RawQuery, State},
     http::{header, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -27,18 +28,49 @@ const MAX_BODY: usize = 100 * 1024 * 1024;
 const RPC_MIN_INTERVAL: Duration = Duration::from_millis(350);
 
 #[derive(Clone)]
-struct Config {
-    network: String,
-    tatum_api_key: String,
+struct NetCfg {
     rpc_url: String,
-    walrus_publisher: String,
-    walrus_aggregator: String,
-    epochs: u32,
-    port: u16,
+    publisher: String,
+    aggregator: String,
     package_id: String,
 }
 
-type ExplorerCache = Arc<Mutex<Option<(Instant, Value)>>>;
+#[derive(Clone)]
+struct Config {
+    tatum_api_key: String,
+    default_network: String,
+    epochs: u32,
+    port: u16,
+    testnet: NetCfg,
+    mainnet: NetCfg,
+}
+
+impl Config {
+    fn net(&self, network: &str) -> &NetCfg {
+        if network == "mainnet" {
+            &self.mainnet
+        } else {
+            &self.testnet
+        }
+    }
+
+    fn pick(&self, requested: Option<&str>) -> (String, &NetCfg) {
+        let name = match requested {
+            Some("mainnet") => "mainnet",
+            Some("testnet") => "testnet",
+            _ if self.default_network == "mainnet" => "mainnet",
+            _ => "testnet",
+        };
+        (name.to_string(), self.net(name))
+    }
+}
+
+#[derive(Deserialize)]
+struct NetQuery {
+    network: Option<String>,
+}
+
+type ExplorerCache = Arc<Mutex<HashMap<String, (Instant, Value)>>>;
 
 #[derive(Clone)]
 struct AppState {
@@ -56,13 +88,19 @@ fn env_or(key: &str, default: &str) -> String {
     }
 }
 
-fn resolve_config() -> Config {
-    let network = env_or("SUIDROP_NETWORK", "testnet");
-    let tatum_api_key = std::env::var("TATUM_API_KEY").unwrap_or_default();
+fn env_first(keys: &[&str]) -> String {
+    for k in keys {
+        if let Ok(v) = std::env::var(k) {
+            if !v.trim().is_empty() {
+                return v;
+            }
+        }
+    }
+    String::new()
+}
 
-    let rpc_url = format!("https://sui-{network}.gateway.tatum.io");
-
-    let (def_pub, def_agg) = match network.as_str() {
+fn net_cfg(network: &str, package_id: String) -> NetCfg {
+    let (pub_, agg) = match network {
         "mainnet" => (
             "https://publisher.walrus-mainnet.walrus.space",
             "https://aggregator.walrus-mainnet.walrus.space",
@@ -71,6 +109,20 @@ fn resolve_config() -> Config {
             "https://publisher.walrus-testnet.walrus.space",
             "https://aggregator.walrus-testnet.walrus.space",
         ),
+    };
+    NetCfg {
+        rpc_url: format!("https://sui-{network}.gateway.tatum.io"),
+        publisher: pub_.to_string(),
+        aggregator: agg.to_string(),
+        package_id,
+    }
+}
+
+fn resolve_config() -> Config {
+    let tatum_api_key = std::env::var("TATUM_API_KEY").unwrap_or_default();
+    let default_network = match env_or("SUIDROP_DEFAULT_NETWORK", "mainnet").as_str() {
+        "testnet" => "testnet".to_string(),
+        _ => "mainnet".to_string(),
     };
 
     let epochs = std::env::var("WALRUS_EPOCHS")
@@ -83,49 +135,56 @@ fn resolve_config() -> Config {
         .and_then(|s| s.parse().ok())
         .unwrap_or(8080);
 
+    let testnet_pkg = env_first(&["SUIDROP_PACKAGE_ID_TESTNET", "SUIDROP_PACKAGE_ID"]);
+    let mainnet_pkg = env_first(&["SUIDROP_PACKAGE_ID_MAINNET"]);
+
     Config {
-        network,
         tatum_api_key,
-        rpc_url,
-        walrus_publisher: env_or("WALRUS_PUBLISHER", def_pub),
-        walrus_aggregator: env_or("WALRUS_AGGREGATOR", def_agg),
+        default_network,
         epochs,
         port,
-        package_id: std::env::var("SUIDROP_PACKAGE_ID").unwrap_or_default(),
+        testnet: net_cfg("testnet", testnet_pkg),
+        mainnet: net_cfg("mainnet", mainnet_pkg),
     }
 }
 
+async fn rpc_gate(s: &AppState) {
+    let mut last = s.rpc_gate.lock().await;
+    let elapsed = last.elapsed();
+    if elapsed < RPC_MIN_INTERVAL {
+        tokio::time::sleep(RPC_MIN_INTERVAL - elapsed).await;
+    }
+    *last = Instant::now();
+}
+
 async fn health_handler(State(s): State<AppState>) -> impl IntoResponse {
-    Json(json!({ "status": "ok", "network": s.cfg.network }))
+    Json(json!({ "status": "ok", "network": s.cfg.default_network }))
 }
 
 async fn official_network_handler(State(s): State<AppState>) -> impl IntoResponse {
-    Json(json!({ "status": 200, "network": format!("sui-{}", s.cfg.network) }))
+    Json(json!({ "status": 200, "network": format!("sui-{}", s.cfg.default_network) }))
 }
 
 async fn config_handler(State(s): State<AppState>) -> impl IntoResponse {
     Json(json!({
-        "network": s.cfg.network,
+        "defaultNetwork": s.cfg.default_network,
         "epochs": s.cfg.epochs,
-        "packageId": s.cfg.package_id,
-        "chain": format!("sui:{}", s.cfg.network),
         "shorten": s.db.is_some(),
+        "networks": {
+            "testnet": { "packageId": s.cfg.testnet.package_id, "chain": "sui:testnet" },
+            "mainnet": { "packageId": s.cfg.mainnet.package_id, "chain": "sui:mainnet" },
+        },
     }))
 }
 
-async fn rpc_proxy(State(s): State<AppState>, body: Bytes) -> Response {
-    {
-        let mut last = s.rpc_gate.lock().await;
-        let elapsed = last.elapsed();
-        if elapsed < RPC_MIN_INTERVAL {
-            tokio::time::sleep(RPC_MIN_INTERVAL - elapsed).await;
-        }
-        *last = Instant::now();
-    }
+async fn rpc_proxy(State(s): State<AppState>, Query(q): Query<NetQuery>, body: Bytes) -> Response {
+    let (_, net) = s.cfg.pick(q.network.as_deref());
+    let rpc_url = net.rpc_url.clone();
+    rpc_gate(&s).await;
 
     let resp = s
         .http
-        .post(&s.cfg.rpc_url)
+        .post(&rpc_url)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ACCEPT, "application/json")
         .header("x-api-key", &s.cfg.tatum_api_key)
@@ -144,10 +203,15 @@ async fn rpc_proxy(State(s): State<AppState>, body: Bytes) -> Response {
     }
 }
 
-async fn walrus_upload(State(s): State<AppState>, body: Bytes) -> Response {
+async fn walrus_upload(
+    State(s): State<AppState>,
+    Query(q): Query<NetQuery>,
+    body: Bytes,
+) -> Response {
+    let (_, net) = s.cfg.pick(q.network.as_deref());
     let url = format!(
         "{}/v1/blobs?epochs={}",
-        s.cfg.walrus_publisher.trim_end_matches('/'),
+        net.publisher.trim_end_matches('/'),
         s.cfg.epochs
     );
 
@@ -170,12 +234,13 @@ async fn walrus_upload(State(s): State<AppState>, body: Bytes) -> Response {
     }
 }
 
-async fn walrus_download(State(s): State<AppState>, Path(id): Path<String>) -> Response {
-    let url = format!(
-        "{}/v1/blobs/{}",
-        s.cfg.walrus_aggregator.trim_end_matches('/'),
-        id
-    );
+async fn walrus_download(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<NetQuery>,
+) -> Response {
+    let (_, net) = s.cfg.pick(q.network.as_deref());
+    let url = format!("{}/v1/blobs/{}", net.aggregator.trim_end_matches('/'), id);
 
     match s.http.get(&url).send().await {
         Ok(r) => {
@@ -250,19 +315,12 @@ async fn esm_proxy(
     }
 }
 
-async fn tatum_call(s: &AppState, method: &str, params: Value) -> Option<Value> {
-    {
-        let mut last = s.rpc_gate.lock().await;
-        let elapsed = last.elapsed();
-        if elapsed < RPC_MIN_INTERVAL {
-            tokio::time::sleep(RPC_MIN_INTERVAL - elapsed).await;
-        }
-        *last = Instant::now();
-    }
+async fn tatum_call(s: &AppState, rpc_url: &str, method: &str, params: Value) -> Option<Value> {
+    rpc_gate(s).await;
     let body = json!({ "id": 1, "jsonrpc": "2.0", "method": method, "params": params });
     let resp = s
         .http
-        .post(&s.cfg.rpc_url)
+        .post(rpc_url)
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::ACCEPT, "application/json")
         .header("x-api-key", &s.cfg.tatum_api_key)
@@ -273,21 +331,28 @@ async fn tatum_call(s: &AppState, method: &str, params: Value) -> Option<Value> 
     resp.json().await.ok()
 }
 
-async fn explorer_handler(State(s): State<AppState>) -> impl IntoResponse {
-    if s.cfg.package_id.is_empty() {
-        return Json(json!({ "drops": 0, "files": 0, "totalSize": 0, "recent": [] }));
+async fn explorer_handler(
+    State(s): State<AppState>,
+    Query(q): Query<NetQuery>,
+) -> impl IntoResponse {
+    let (name, net) = s.cfg.pick(q.network.as_deref());
+    if net.package_id.is_empty() {
+        return Json(
+            json!({ "network": name, "drops": 0, "files": 0, "totalSize": 0, "recent": [] }),
+        );
     }
 
     {
         let cache = s.explorer_cache.lock().await;
-        if let Some((at, value)) = cache.as_ref() {
+        if let Some((at, value)) = cache.get(&name) {
             if at.elapsed() < Duration::from_secs(60) {
                 return Json(value.clone());
             }
         }
     }
 
-    let event_type = format!("{}::receipt::DropCreated", s.cfg.package_id);
+    let rpc_url = net.rpc_url.clone();
+    let event_type = format!("{}::receipt::DropCreated", net.package_id);
     let mut cursor = Value::Null;
     let mut drops: u64 = 0;
     let mut total: u64 = 0;
@@ -296,7 +361,7 @@ async fn explorer_handler(State(s): State<AppState>) -> impl IntoResponse {
 
     loop {
         let params = json!([{ "MoveEventType": event_type }, cursor, 50, true]);
-        let res = match tatum_call(&s, "suix_queryEvents", params).await {
+        let res = match tatum_call(&s, &rpc_url, "suix_queryEvents", params).await {
             Some(r) => r,
             None => break,
         };
@@ -332,10 +397,10 @@ async fn explorer_handler(State(s): State<AppState>) -> impl IntoResponse {
         cursor = result["nextCursor"].clone();
     }
 
-    let out = json!({ "drops": drops, "files": drops, "totalSize": total, "recent": recent });
+    let out = json!({ "network": name, "drops": drops, "files": drops, "totalSize": total, "recent": recent });
     {
         let mut cache = s.explorer_cache.lock().await;
-        *cache = Some((Instant::now(), out.clone()));
+        cache.insert(name, (Instant::now(), out.clone()));
     }
     Json(out)
 }
@@ -483,7 +548,7 @@ async fn main() {
     let state = AppState {
         http: reqwest::Client::new(),
         rpc_gate: Arc::new(Mutex::new(Instant::now() - RPC_MIN_INTERVAL)),
-        explorer_cache: Arc::new(Mutex::new(None)),
+        explorer_cache: Arc::new(Mutex::new(HashMap::new())),
         db,
         cfg: cfg.clone(),
     };
@@ -510,9 +575,8 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], cfg.port));
     tracing::info!(
-        "SuiDrop listening on http://{addr} (network: {}, walrus: {})",
-        cfg.network,
-        cfg.walrus_publisher
+        "SuiDrop listening on http://{addr} (default network: {})",
+        cfg.default_network
     );
 
     let listener = tokio::net::TcpListener::bind(addr)
